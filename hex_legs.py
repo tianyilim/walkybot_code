@@ -3,12 +3,16 @@
 
 # types of object: 
 # Servo object - simple end effector (will have 18)
-# Leg object - combination of three servos
+# Leg object - combination of three servos -- Contains the leg IK
+# Leg driver - banks of three legs
+# Hexapod - all six legs -- Contains the body IK
 
 # TODO write functions for the behaviour of the higher-hierarchy objects.
+# Eventually this will be refactored to be in C++ for SPEED
 
 from adafruit_servokit import ServoKit
 import warnings # Tells if we are doing something wrong
+import numpy as np
 
 class legJoint:
     # "Public" variables
@@ -58,13 +62,40 @@ class legJoint:
 
         return self.curr_angle
 
+    # Prints info to debug stuff with on to console
+    def debug_print(self):
+        print("For servo", self.__class__.__name__)
+        print("Current Angle:", self.curr_angle, "Offset:", self._offset)
+        print("+ve limit:", self._angle_max, "-ve limit:", self._angle_min)
+    
+    # returns a list of important info
+    def debug_return(self):
+        info = [self.curr_angle, self._offset, self._angle_max, self._angle_min]
+        return info
+
 # Contains the Leg IK
 class hexLeg:
     # Private variables
+    ## Servo addresses
     _coxa_num = 0
     _tibia_num = 0
     _femur_num = 0
     _left_right = True
+
+    # Leg IK parameters in millimeters (mm)
+    _coxa_len = 28.75
+    _tibia_len = 68.825
+    _femur_len = 40
+    _z_offset = 68.825
+    _l_len = np.sqrt( _z_offset**2 + _coxa_len**2 ) # Z-offset can change!
+
+    # coordinates for IK. Note that they are in different reference frames to each other.
+    _tip_coords = (0.0, _coxa_len+_femur_len, _z_offset) # base WRT tip (x,y,z)
+
+    _base_coords = (0.0, 0.0, 0.0)
+
+    # individual servo angles
+    _servo_angles = (90.0, 90.0, 90.0) # (coxa, femur, tibia)
 
     # Public variables
     coxa = None
@@ -92,6 +123,7 @@ class hexLeg:
         self.coxa = legJoint(kit, self._coxa_num)
         self.tibia = legJoint(kit, self._tibia_num)
         self.femur = legJoint(kit, self._tibia_num) # Attach these things.
+        self.joints = (self.coxa, self.tibia, self.femur) # update
 
     def update_limits(self, limits):
         if len(limits) == len(self.joints):
@@ -106,13 +138,56 @@ class hexLeg:
     #     self.tibia.writeLimit(limit_tibia)
     #     self.femur.writeLimit(limit_femur)
 
+    # directly writes servo angles to the servos
     def write_angles(self, angles):
         if len(angles) == len(self.joints):
+            self._servo_angles = angles
             for x in range(len(self.joints)):
-                self.joints[x].writeAngle(angles[x])
+                self.joints[x].writeAngle(self._servo_angles[x])
             return True
         else:
             return False
+
+    # Calculates servo angles based on desired x,y,z positions
+    def calc_tip_angles(self, xyz):
+        # TODO error handling if desired coordinate is not reachable within constraints
+
+        coxa_angle = np.arctan2(xyz[0], xyz[1]) + 90
+        femur_angle = np.arccos( (self._femur_len**2 - self._tibia_len**2 + self._l_len**2) / (2* self._femur_len * self._l_len) ) + np.arccos(self._z_offset / self._l_len)
+        tibia_angle = np.arccos( (self._femur_len**2 + self._tibia_len**2 - self._l_len**2) / (2* self._femur_len * self._tibia_len) )
+        self._servo_angles[0] = coxa_angle # coxa angle
+        self._servo_angles[1] = femur_angle # femur angle
+        self._servo_angles[2] = tibia_angle # tibia angle
+        
+        return self._servo_angles
+
+    # update current coords with feedback from servo object (forward kinematics)
+    def get_curr_xyz(self):
+        coxa_angle = self.coxa.currAngle
+        femur_angle = self.femur.currAngle
+        tibia_angle = self.tibia.currAngle
+
+
+
+    def write_tip_angles(self, xyz):
+
+
+    # return current position of leg tip
+    def curr_tip_pos(self):
+        return self._tip_coords
+
+    # Prints debug info
+    def debug_print(self):
+        for servo in self.joints:
+            servo.debug_print()
+
+    # Returns a list of debug info
+    def debug(self):
+        info = []
+        for servo in self.joints:
+            info.append(servo.debug)
+
+        return info
 
 # Starts the servo driver.
 class legDriver:
