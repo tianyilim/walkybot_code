@@ -167,8 +167,11 @@ class hexLeg:
         femur_angle = self.femur.currAngle
         tibia_angle = self.tibia.currAngle
 
+        return info
+
+
     def write_tip_angles(self, xyz):
-        pass
+
 
     # return current position of leg tip
     def curr_tip_pos(self):
