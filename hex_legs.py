@@ -166,8 +166,7 @@ class hexLeg:
         coxa_angle = self.coxa.currAngle
         femur_angle = self.femur.currAngle
         tibia_angle = self.tibia.currAngle
-
-        return info
+    
 
 
     def write_tip_angles(self, xyz):
