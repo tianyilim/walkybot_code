@@ -213,7 +213,7 @@ class leg_joint:
     # Prints info to debug stuff with on to console
     def debug_print(self):
         print("For servo", self.name)
-        print("Current Angle:", self.curr_angle, "Offset:", self._offset)
+        print("Current Angle: %0.4f" %self.curr_angle, "Offset:", self._offset)
         print("+ve limit:", self._angle_max, "-ve limit:", self._angle_min)
     
     # returns a list of important info
@@ -235,7 +235,7 @@ class hex_leg:
     TIBIA_LEN = 68.825
 
     def __init__(self, leg_end, leg_ori_z, leg_nums, servoKit, leg_name,
-                limits=np.array((30.0, 30.0, 30.0)), offsets=np.array((0.0, 0.0, 0.0))):
+                limits=(30.0, 30.0, 30.0), offsets=(0.0, 0.0, 0.0) ):
 
         self._leg_ori[2] = leg_ori_z
         self._leg_end = leg_end
@@ -244,13 +244,14 @@ class hex_leg:
         femur_joint = leg_joint(servo_num=leg_nums[1], servoKit=servoKit, name=leg_name+' femur', limit=limits[1], offset=offsets[1])
         tibia_joint = leg_joint(servo_num=leg_nums[2], servoKit=servoKit, name=leg_name+' tibia', limit=limits[2], offset=offsets[2])
         self.joints = (coxa_joint, femur_joint, tibia_joint)
+        print(self.joints)
         self.writeAngles()
 
     def writeAngles(self):
-        print("moving servos!")
-        self.joints[0].writeAngle = self._leg_angles[0]
-        self.joints[1].writeAngle = self._leg_angles[1]
-        self.joints[2].writeAngle = self._leg_angles[2]
+        # print("\nmoving servos!")
+        print( self.joints[0].writeAngle(self._leg_angles[0]) )
+        print( self.joints[1].writeAngle(self._leg_angles[1]) )
+        print( self.joints[2].writeAngle(self._leg_angles[2]) )
     
     # Leg tip moves, leg origin does not
     def swing(self, leg_end):
