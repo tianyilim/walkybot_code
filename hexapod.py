@@ -230,28 +230,41 @@ class hex_leg:
 
     joints = None
 
+    left_right_mult = True
+
     COXA_LEN = 28.75
     FEMUR_LEN = 40.0
     TIBIA_LEN = 68.825
 
-    def __init__(self, leg_end, leg_ori_z, leg_nums, servoKit, leg_name,
-                limits=(30.0, 30.0, 30.0), offsets=(0.0, 0.0, 0.0) ):
+    def __init__(self, leg_end, leg_ori_z, leg_nums, servoKit, leg_name, left_right,
+                limits=(45.0, 70.0, 80.0), offsets=(0.0, 0.0, 0.0) ):
 
         self._leg_ori[2] = leg_ori_z
         self._leg_end = leg_end
+
+        if left_right=='left':
+            self.left_right_mult = False
+        elif left_right=='right':
+            self.left_right_mult = True
+        else:
+            print("Invalid input!")
 
         coxa_joint = leg_joint(servo_num=leg_nums[0], servoKit=servoKit, name=leg_name+' coxa', limit=limits[0], offset=offsets[0])
         femur_joint = leg_joint(servo_num=leg_nums[1], servoKit=servoKit, name=leg_name+' femur', limit=limits[1], offset=offsets[1])
         tibia_joint = leg_joint(servo_num=leg_nums[2], servoKit=servoKit, name=leg_name+' tibia', limit=limits[2], offset=offsets[2])
         self.joints = (coxa_joint, femur_joint, tibia_joint)
-        print(self.joints)
         self.writeAngles()
 
     def writeAngles(self):
         # print("\nmoving servos!")
-        print( self.joints[0].writeAngle(self._leg_angles[0]) )
-        print( self.joints[1].writeAngle(self._leg_angles[1]) )
-        print( self.joints[2].writeAngle(self._leg_angles[2]) )
+        if self.left_right_mult == True:
+            self.joints[0].writeAngle(self._leg_angles[0])
+            self.joints[1].writeAngle(self._leg_angles[1])
+            self.joints[2].writeAngle(180-self._leg_angles[2])
+        else:
+            self.joints[0].writeAngle(self._leg_angles[0])
+            self.joints[1].writeAngle(180-self._leg_angles[1])
+            self.joints[2].writeAngle(self._leg_angles[2])
     
     # Leg tip moves, leg origin does not
     def swing(self, leg_end):
@@ -267,16 +280,18 @@ class hex_leg:
         z_offset_ik = self.TIBIA_LEN - leg_end[2]
         l_len = np.sqrt( np.power(z_offset_ik,2) + np.power(y_offset_ik,2) )
 
-        print("z_offset_ik: %0.4f | y_offset_ik: %0.4f | l_len: %0.4f" %(z_offset_ik, y_offset_ik, l_len) )
-
+        # print("z_offset_ik: %0.4f | y_offset_ik: %0.4f | l_len: %0.4f" %(z_offset_ik, y_offset_ik, l_len) )
+    
         femur_angle_ik1 = np.arccos( z_offset_ik / l_len )
         femur_angle_ik2 = np.arccos( (femur_len_ik**2 + l_len**2 - tibia_len_ik**2) / (2*femur_len_ik*l_len) )
         femur_angle_ik = femur_angle_ik1 + femur_angle_ik2
         tibia_angle_ik = np.arccos( (femur_len_ik**2 - l_len**2 + tibia_len_ik**2) / (2*femur_len_ik*tibia_len_ik) )
 
         self._leg_angles = np.array( (to_degs(coxa_angle_ik)+90, to_degs(femur_angle_ik), to_degs(tibia_angle_ik)) )
-
         self.writeAngles()
+        
+        # print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
+
         return self._leg_angles
 
     # Leg origin moves. Update leg end; after all, leg end is RELATIVE to leg origin (always 0,0,Z)
