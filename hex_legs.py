@@ -1,3 +1,5 @@
+''' THIS FILE IS DEPRECEATED. USE hexapod.py'''
+
 # Header file for walkybot.
 # Instanstiates the legs and applies corrections.
 

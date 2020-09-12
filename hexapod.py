@@ -12,155 +12,6 @@ def to_degs(num):
 def pythagoras(nums):
     return np.sqrt(np.sum(np.power(nums, 2), axis=1))
 
-class hexapod:
-    # As always, leg order is (R123,L321) and coords are (x,y,z)
-    # DO NOT WRITE TO THESE DIRECLTY - getter/setter
-    _leg_end_loc = np.zeros((6,3)) # Local coordinates of leg tips
-    _leg_ori_loc = np.zeros((6,3)) # local coordinates of leg origins (local to each leg)
-    _leg_end_abs = np.zeros((6,3)) # absolute coordinates
-    _leg_ori_abs = np.zeros((6,3))
-    _leg_angle = np.zeros(6) # Each leg's coxa angle (gamma)
-    _body_z = 68.825 # Body origin (0,0,z)
-    _roll = 0.0
-    _pitch = 0.0
-
-    # body parameters
-    X0_LEN = 45.768
-    Y0_LEN = 26.424
-    Y1_LEN = 52.848
-    OFFSET_ROLL = np.array((Y0_LEN, Y1_LEN, Y0_LEN, -Y0_LEN, -Y1_LEN, -Y0_LEN)) # Roll modifies Z based on y-coord
-    OFFSET_PITCH = np.array((X0_LEN, 0.0, -X0_LEN, -X0_LEN, 0.0, X0_LEN)) # Pitch modifies Z based on x-coord
-    OFFSET_ANGLE = np.array((30, 90, 150, 210, 270, 330), dtype='float32') # Modify angle offset for each
-    
-    def __init__(self, leg_end_loc=None, leg_ori_loc=None, leg_end_abs=None, 
-                leg_angle=np.array((90.0, 90.0, 90.0, 90.0, 90.0, 90.0)), body_z=68.825, roll=0.0, pitch=0.0):
-
-        self._leg_angle = leg_angle # initialise these constants
-        self._body_z = body_z
-        self._roll = roll
-        self._pitch = pitch
-
-        # Set leg origins based on roll and pitch settings
-        self._leg_ori_loc[:, 2] = self._body_z + self.OFFSET_ROLL*np.sin(to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(self._pitch))
-        self._leg_ori_abs[:, 0] = self.OFFSET_PITCH*np.cos(to_rads(self._pitch))
-        self._leg_ori_abs[:, 1] = self.OFFSET_ROLL*np.cos(to_rads(self._roll))
-
-        if leg_end_loc is None: 
-            if leg_end_abs is None:
-                print("Specify local or absolute coordinates for leg tips!")
-            else:
-                # print("Setting leg tips absolutely")
-                self.set_leg_end_abs(leg_end_abs)
-        elif leg_end_abs is not None:
-            print("Only local or absolute coordinates for leg tips should be given!")
-        
-        else:
-            # print("Setting leg tips locally")
-            self.set_leg_end_loc(leg_end_loc)
-
-    # Helper functions
-    # def to_rads(self, num):
-    #     return num*np.pi/180
-    # def to_degs(self, num):
-    #     return num/np.pi*180
-    # def pythagoras(self, nums):
-    #     return np.sqrt(np.sum(np.power(nums, 2), axis=1))
-
-    # Sets local value for leg tip, and changes other relevant values
-    def set_leg_end_loc(self, newval):
-        self._leg_end_loc = newval
-        self._leg_end_abs[:, 2] = self._leg_end_loc[:, 2] # Z is absolute
-        leg_len = self.pythagoras(self._leg_end_loc[:, 0:2])
-        phi = 180-self.OFFSET_ANGLE-self._leg_angle
-        self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
-        self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
-
-    # Sets absolute value for leg tip, and changes other relevant values
-    # Overwrites angle as well
-    def set_leg_end_abs(self, newval):
-        self._leg_end_abs = newval
-        self._leg_end_loc[:, 2] = self._leg_end_abs[:, 2] # Z is absolute
-        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2]
-        leg_len = self.pythagoras(delta_xy)
-        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE
-        self._leg_end_loc[:, 0] = leg_len[:, 0] * np.sin(to_rads(self._leg_angle))
-        self._leg_end_loc[:, 1] = leg_len[:, 1] * np.cos(to_rads(self._leg_angle))
-
-    # Sets value for leg angle - changes absolute leg positions(x,y) as well
-    def set_leg_angle(self, newval):
-        self._leg_angle = newval
-        leg_len = self.pythagoras(self._leg_end_loc[:, 0:2])
-        phi = 180-self.OFFSET_ANGLE-self._leg_angle
-        self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
-        self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
-
-    # Rolls the body. Body absolute and relative coordinates change.
-    def body_roll(self, roll):
-        self._roll = roll
-        self._leg_ori_loc[:, 2] = self._body_z + self.OFFSET_ROLL*np.sin(to_rads(self._roll))
-        self._leg_ori_abs[:, 2] = self._leg_ori_loc[:, 2]
-        self._leg_ori_abs[:, 1] = self.OFFSET_ROLL*np.cos(to_rads(self._roll))
-
-    # Pitches the body. Body absolute and relative coordinates change.
-    def body_pitch(self, pitch):
-        self._pitch = pitch
-        self._leg_ori_loc[:, 2] = self._body_z + self.OFFSET_PITCH*np.sin(to_rads(self._pitch))
-        self._leg_ori_abs[:, 2] = self._leg_ori_loc[:, 2]
-        self._leg_ori_abs[:, 0] = self.OFFSET_PITCH*np.cos(to_rads(self._pitch))
-
-    # Rotates the body. Body absolute and relative coordinates change, but leg does not.
-    def body_rotate(self, theta):
-        distances = self.pythagoras( self._leg_ori_abs[:, 0:2] )
-        angles = to_degs(np.arctan2( self._leg_ori_abs[:, 1], self._leg_ori_abs[:, 0]))+theta
-
-        self._leg_ori_abs[:, 0] = distances * np.cos( to_rads( angles ) )
-        self._leg_ori_abs[:, 1] = distances * np.sin( to_rads( angles ) )
-
-    def body_translate_x(self, x):
-        self._leg_ori_abs[:, 0] += x
-        self._leg_ori_loc[:, 0] += x
-
-    def body_translate_y(self, y):
-        self._leg_ori_abs[:, 1] += y
-        self._leg_ori_loc[:, 1] += y
-
-    def body_translate_z(self, z):
-        self._body_z = z
-        self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
-        self.body_roll(self._roll)
-
-    # Recenters origin coordinates back to (0,0) - after successfully moving?
-    def body_recenter(self):
-        self._leg_ori_abs[:,0:2] = 0.0
-        self._leg_ori_loc[:,0] = self.OFFSET_PITCH
-        self._leg_ori_loc[:,1] = self.OFFSET_ROLL
-        self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
-        self.body_roll(self._roll)
-    
-    def get_leg_end_loc(self):
-        return self._leg_end_loc
-    def get_leg_end_abs(self):
-        return self._leg_end_abs
-    def get_leg_ori_loc(self):
-        return self._leg_ori_loc
-    def get_leg_ori_abs(self):
-        return self._leg_ori_abs
-    def get_leg_angle(self):
-        return self._leg_angle
-    def get_body_z(self):
-        return self._body_z
-
-    def print_state(self): # Sanity check
-        np.set_printoptions(precision=3, suppress=True) # print prettier
-        print("Local leg endpoints:\n", self._leg_end_loc)
-        print("Abs leg endpoints:\n", self._leg_end_abs)
-        print("Local leg origin:\n", self._leg_ori_loc)
-        print("Abs leg origin:\n", self._leg_ori_abs)
-        print("Leg Angles:\n", self._leg_angle)
-        print("Body Z-height:", self._body_z)
-        print("Body roll:", self._roll)
-        print("Body pitch:", self._pitch)
-
 # Class for legs and joints
 class leg_joint:
     # "Public" variables
@@ -319,3 +170,170 @@ class hex_leg:
         return self._leg_end
     def get_leg_angles(self):
         return self._leg_angles
+
+# Class for hexapod
+class hexapod:
+    # As always, leg order is (R123,L321) and coords are (x,y,z)
+    # DO NOT WRITE TO THESE DIRECLTY - getter/setter
+    _leg_end_loc = np.zeros((6,3)) # Local coordinates of leg tips
+    _leg_ori_loc = np.zeros((6,3)) # local coordinates of leg origins (local to each leg)
+    _leg_end_abs = np.zeros((6,3)) # absolute coordinates
+    _leg_ori_abs = np.zeros((6,3))
+    _leg_angle = np.zeros(6) # Each leg's coxa angle (gamma)
+    _body_z = 68.825 # Body origin (0,0,z)
+    _roll = 0.0
+    _pitch = 0.0
+
+    # body parameters
+    X0_LEN = 45.768
+    Y0_LEN = 26.424
+    Y1_LEN = 52.848
+    OFFSET_ROLL = np.array((Y0_LEN, Y1_LEN, Y0_LEN, -Y0_LEN, -Y1_LEN, -Y0_LEN)) # Roll modifies Z based on y-coord
+    OFFSET_PITCH = np.array((X0_LEN, 0.0, -X0_LEN, -X0_LEN, 0.0, X0_LEN)) # Pitch modifies Z based on x-coord
+    OFFSET_ANGLE = np.array((30, 90, 150, 210, 270, 330), dtype='float32') # Modify angle offset for each
+
+    # Addressing all legs
+    legs = None
+    
+    def __init__(self, leg_end_loc=None, leg_ori_loc=None, leg_end_abs=None, 
+                leg_angle=np.array((90.0, 90.0, 90.0, 90.0, 90.0, 90.0)), body_z=68.825, roll=0.0, pitch=0.0):
+
+        self._leg_angle = leg_angle # initialise these constants
+        self._body_z = body_z
+        self._roll = roll
+        self._pitch = pitch
+
+        # Set leg origins based on roll and pitch settings
+        self._leg_ori_loc[:, 2] = self._body_z + self.OFFSET_ROLL*np.sin(to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(self._pitch))
+        self._leg_ori_abs[:, 0] = self.OFFSET_PITCH*np.cos(to_rads(self._pitch))
+        self._leg_ori_abs[:, 1] = self.OFFSET_ROLL*np.cos(to_rads(self._roll))
+
+        if leg_end_loc is None: 
+            if leg_end_abs is None:
+                print("Specify local or absolute coordinates for leg tips!")
+            else:
+                self.set_leg_end_abs(leg_end_abs)
+        elif leg_end_abs is not None:
+            print("Only local or absolute coordinates for leg tips should be given!")
+        else:
+            self.set_leg_end_loc(leg_end_loc)
+
+        # Init all six legs
+        leftServos = ServoKit(channels=16, address=0x42)
+        rightServos = ServoKit(channels=16, address=0x41)
+        leg_r1 = hex_leg(self._leg_end_loc[0], self._leg_ori_loc[0, 2], leg_nums=(15,14,13), servoKit=rightServos, leg_name="leg_r1", offsets=(25,25,30))
+        leg_r2 = hex_leg(self._leg_end_loc[1], self._leg_ori_loc[1, 2], leg_nums=(11,10,9), servoKit=rightServos, leg_name="leg_r2", offsets=(0,20,35))
+        leg_r3 = hex_leg(self._leg_end_loc[2], self._leg_ori_loc[2, 2], leg_nums=(7,6,5), servoKit=rightServos, leg_name="leg_r3", offsets=(0,25,5))
+
+        leg_l1 = hex_leg(self._leg_end_loc[3], self._leg_ori_loc[3, 2], leg_nums=(0,1,2), servoKit=leftServos, leg_name="leg_l1", offsets=(0,-10,-5))
+        leg_l2 = hex_leg(self._leg_end_loc[4], self._leg_ori_loc[4, 2], leg_nums=(4,5,6), servoKit=leftServos, leg_name="leg_l2", offsets=(0,15,15))
+        leg_l3 = hex_leg(self._leg_end_loc[5], self._leg_ori_loc[5, 2], leg_nums=(8,9,10), servoKit=leftServos, leg_name="leg_l3", offsets=(10,10,0))
+
+        self.legs = (leg_r1, leg_r2, leg_r3, leg_l3, leg_l2, leg_l1)
+
+    # Sets local value for leg tip, and changes other relevant values
+    def set_leg_end_loc(self, newval):
+        self._leg_end_loc = newval
+        self._leg_end_abs[:, 2] = self._leg_end_loc[:, 2] # Z is absolute
+        leg_len = pythagoras(self._leg_end_loc[:, 0:2])
+        phi = 180-self.OFFSET_ANGLE-self._leg_angle
+        self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
+        self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
+
+    # Sets absolute value for leg tip, and changes other relevant values
+    # Overwrites angle as well
+    def set_leg_end_abs(self, newval):
+        self._leg_end_abs = newval
+        self._leg_end_loc[:, 2] = self._leg_end_abs[:, 2] # Z is absolute
+        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2]
+        leg_len = pythagoras(delta_xy)
+        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE
+        self._leg_end_loc[:, 0] = leg_len[:, 0] * np.sin(to_rads(self._leg_angle))
+        self._leg_end_loc[:, 1] = leg_len[:, 1] * np.cos(to_rads(self._leg_angle))
+
+    # Sets value for leg angle - changes absolute leg positions(x,y) as well
+    def set_leg_angle(self, newval):
+        self._leg_angle = newval
+        leg_len = pythagoras(self._leg_end_loc[:, 0:2])
+        phi = 180-self.OFFSET_ANGLE-self._leg_angle
+        self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
+        self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
+
+    # Rolls the body. Body absolute and relative coordinates change.
+    def body_roll(self, roll):
+        self._roll = roll
+        self._leg_ori_loc[:, 2] = self._body_z + self.OFFSET_ROLL*np.sin(to_rads(self._roll))
+        self._leg_ori_abs[:, 2] = self._leg_ori_loc[:, 2]
+        self._leg_ori_abs[:, 1] = self.OFFSET_ROLL*np.cos(to_rads(self._roll))
+
+    # Pitches the body. Body absolute and relative coordinates change.
+    def body_pitch(self, pitch):
+        self._pitch = pitch
+        self._leg_ori_loc[:, 2] = self._body_z + self.OFFSET_PITCH*np.sin(to_rads(self._pitch))
+        self._leg_ori_abs[:, 2] = self._leg_ori_loc[:, 2]
+        self._leg_ori_abs[:, 0] = self.OFFSET_PITCH*np.cos(to_rads(self._pitch))
+
+    # Rotates the body. Body absolute and relative coordinates change, but leg does not.
+    def body_rotate(self, theta):
+        distances = pythagoras( self._leg_ori_abs[:, 0:2] )
+        angles = to_degs(np.arctan2( self._leg_ori_abs[:, 1], self._leg_ori_abs[:, 0]))+theta
+
+        self._leg_ori_abs[:, 0] = distances * np.cos( to_rads( angles ) )
+        self._leg_ori_abs[:, 1] = distances * np.sin( to_rads( angles ) )
+
+    def body_translate_x(self, x):
+        self._leg_ori_abs[:, 0] += x
+        self._leg_ori_loc[:, 0] += x
+
+    def body_translate_y(self, y):
+        self._leg_ori_abs[:, 1] += y
+        self._leg_ori_loc[:, 1] += y
+
+    def body_translate_z(self, z):
+        self._body_z = z
+        self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
+        self.body_roll(self._roll)
+
+    # Recenters origin coordinates back to (0,0) - after successfully moving?
+    def body_recenter(self):
+        self._leg_ori_abs[:,0:2] = 0.0
+        self._leg_ori_loc[:,0] = self.OFFSET_PITCH
+        self._leg_ori_loc[:,1] = self.OFFSET_ROLL
+        self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
+        self.body_roll(self._roll)
+    
+    # Writing updated coordinates to the legs. Legs move but origin does not.
+    def update_legs_swing(self):
+        for i in range(len(self.legs)):
+            self.legs[i].swing(self._leg_end_loc[i])
+    
+    # Origin moves but leg does not.
+    def update_legs_stance(self):
+        for i in range(len(self.legs)):
+            self.legs[i].stance(self._leg_ori_loc[i])
+        # Don't forget to recenter
+        self.body_recenter()
+
+    def get_leg_end_loc(self):
+        return self._leg_end_loc
+    def get_leg_end_abs(self):
+        return self._leg_end_abs
+    def get_leg_ori_loc(self):
+        return self._leg_ori_loc
+    def get_leg_ori_abs(self):
+        return self._leg_ori_abs
+    def get_leg_angle(self):
+        return self._leg_angle
+    def get_body_z(self):
+        return self._body_z
+
+    def print_state(self): # Sanity check
+        np.set_printoptions(precision=3, suppress=True) # print prettier
+        print("Local leg endpoints:\n", self._leg_end_loc)
+        print("Abs leg endpoints:\n", self._leg_end_abs)
+        print("Local leg origin:\n", self._leg_ori_loc)
+        print("Abs leg origin:\n", self._leg_ori_abs)
+        print("Leg Angles:\n", self._leg_angle)
+        print("Body Z-height:", self._body_z)
+        print("Body roll:", self._roll)
+        print("Body pitch:", self._pitch)
