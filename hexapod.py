@@ -185,7 +185,12 @@ class hex_leg:
         return self._leg_end
     def get_leg_angles(self):
         return self._leg_angles
-
+    
+    def debug_print(self):
+        print("Leg origin: \n", self._leg_ori)
+        print("Leg end: \n", self._leg_end)
+        print("Leg angles: \n", self._leg_angles)
+        
 # Class for hexapod
 class hexapod:
     # As always, leg order is (R123,L321) and coords are (x,y,z)
@@ -236,13 +241,19 @@ class hexapod:
         # Init all six legs
         leftServos = ServoKit(channels=16, address=0x42)
         rightServos = ServoKit(channels=16, address=0x41)
-        leg_r1 = hex_leg(self._leg_end_loc[0], self._leg_ori_loc[0, 2], leg_nums=(15,14,13), servoKit=rightServos, leg_name="leg_r1", offsets=(25,25,30))
-        leg_r2 = hex_leg(self._leg_end_loc[1], self._leg_ori_loc[1, 2], leg_nums=(11,10,9), servoKit=rightServos, leg_name="leg_r2", offsets=(0,20,35))
-        leg_r3 = hex_leg(self._leg_end_loc[2], self._leg_ori_loc[2, 2], leg_nums=(7,6,5), servoKit=rightServos, leg_name="leg_r3", offsets=(0,25,5))
+        leg_r1 = hex_leg(self._leg_end_loc[0], self._leg_ori_loc[0, 2], leg_nums=(15,14,13), servoKit=rightServos, 
+                        left_right='right', leg_name="leg_r1", offsets=(25,25,30))
+        leg_r2 = hex_leg(self._leg_end_loc[1], self._leg_ori_loc[1, 2], leg_nums=(11,10,9), servoKit=rightServos,
+                        left_right='right', leg_name="leg_r2", offsets=(0,20,35))
+        leg_r3 = hex_leg(self._leg_end_loc[2], self._leg_ori_loc[2, 2], leg_nums=(7,6,5), servoKit=rightServos,
+                        left_right='right', leg_name="leg_r3", offsets=(0,25,5))
 
-        leg_l1 = hex_leg(self._leg_end_loc[3], self._leg_ori_loc[3, 2], leg_nums=(0,1,2), servoKit=leftServos, leg_name="leg_l1", offsets=(0,-10,-5))
-        leg_l2 = hex_leg(self._leg_end_loc[4], self._leg_ori_loc[4, 2], leg_nums=(4,5,6), servoKit=leftServos, leg_name="leg_l2", offsets=(0,15,15))
-        leg_l3 = hex_leg(self._leg_end_loc[5], self._leg_ori_loc[5, 2], leg_nums=(8,9,10), servoKit=leftServos, leg_name="leg_l3", offsets=(10,10,0))
+        leg_l1 = hex_leg(self._leg_end_loc[3], self._leg_ori_loc[3, 2], leg_nums=(0,1,2), servoKit=leftServos,
+                        left_right='left', leg_name="leg_l1", offsets=(0,-10,-5))
+        leg_l2 = hex_leg(self._leg_end_loc[4], self._leg_ori_loc[4, 2], leg_nums=(4,5,6), servoKit=leftServos,
+                        left_right='left', leg_name="leg_l2", offsets=(0,15,15))
+        leg_l3 = hex_leg(self._leg_end_loc[5], self._leg_ori_loc[5, 2], leg_nums=(8,9,10), servoKit=leftServos,
+                        left_right='left', leg_name="leg_l3", offsets=(10,10,0))
 
         self.legs = (leg_r1, leg_r2, leg_r3, leg_l3, leg_l2, leg_l1)
 

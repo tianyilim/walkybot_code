@@ -10,3 +10,5 @@ leg_angles = np.tile(90.0, 6)  # leg angle init
 # print(leg_end_coords, leg_end_coords.shape)
 walky = hexapod.hexapod(leg_end_loc=leg_end_coords, leg_angle=leg_angles)
 
+for leg in walky.legs:
+    leg.debug_print()
