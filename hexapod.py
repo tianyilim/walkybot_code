@@ -13,6 +13,28 @@ def to_degs(num):
     return num*180/np.pi
 def pythagoras(nums):
     return np.sqrt(np.sum(np.power(nums, 2), axis=1))
+# def get_quadrant(num):
+#     while 0 <= num <= 360:
+#         if num > 360:
+#             num -= 360
+#         if num < 0:
+#             num += 360
+    
+#     if 0 <= num <= 90:
+#         print("A")
+#         return 1
+#     elif 90 < num <= 180:
+#         print("S")
+#         return 2
+#     elif 180 < num <= 270:
+#         print("T")
+#         return 3
+#     elif 270 < num <= 360:
+#         print("C")
+#         return 4
+#     else:
+#         print(num, "error")
+#         return 0
 
 # Class for legs and joints
 class leg_joint:
@@ -125,6 +147,7 @@ class hex_leg:
             self.joints[2].writeAngle( self._leg_angles[2])
     
     # Leg tip moves, leg origin does not
+    # This is wrong?
     def swing(self, leg_end):
         self._leg_end = leg_end
 
@@ -163,11 +186,9 @@ class hex_leg:
     def stance(self, leg_ori):
         diff = leg_ori - self._leg_ori
         save_leg_end = self._leg_end
-        self._leg_end += diff
         self._leg_ori = leg_ori # update leg origin
 
-        angles = self.swing(self._leg_end)
-        
+        angles = self.swing(self._leg_end-diff) # Moving chassis +x units means moving leg -x units
         self._leg_end = save_leg_end
 
         return angles
@@ -315,35 +336,34 @@ class hexapod:
     # Sets value for leg origin (updates local values accordingly)
     def set_leg_ori_abs(self, newval):
         delta = newval - self.OFFSET_ORIGINS # diff between "regular positions" and commanded ones
-        distance = pythagoras(delta[:,0:2])
-        print("yaw:", self._yaw, "\ndelta x:", delta[:,0], "\ndelta y:", delta[:, 1], "\ndistance:", distance)
-        angle = to_degs( np.arctan2(delta[:,1], delta[:,2]) )
-        phi = angle - self.OFFSET_ANGLE
+        offset_angle = self._yaw + self.OFFSET_ANGLE
+        deltax = delta[:,0]
+        deltay = delta[:,1]
+        # print("yaw:", self._yaw, "\ndelta x:", deltax, "\ndelta y:", deltay, 
+        #     "\noffset_angle:\n", offset_angle)
 
         self._leg_ori_abs = newval
         self._leg_ori_loc[:,2] = newval[:,2] # Z is absolute as usual
-        # self._leg_ori_loc[:,0] = delta[:,0]*np.cos(to_rads(self.OFFSET_ANGLE+self._yaw)) + delta[:,1]*np.sin(to_rads(self.OFFSET_ANGLE+self._yaw))
-        # self._leg_ori_loc[:,1] = delta[:,1]*np.cos(to_rads(self.OFFSET_ANGLE+self._yaw)) + delta[:,0]*np.sin(to_rads(self.OFFSET_ANGLE+self._yaw))
-        self._leg_ori_loc[:,0] = distance * np.cos( to_rads(phi) )
-        self._leg_ori_loc[:,1] = distance * np.sin( to_rads(phi) )
+        self._leg_ori_loc[:,0] = deltax*np.cos(to_rads(90-offset_angle)) + deltay*np.sin(to_rads(offset_angle-90))
+        self._leg_ori_loc[:,1] = deltay*np.cos(to_rads(offset_angle-90)) + deltax*np.sin(to_rads(90-offset_angle))
         
-        print("Leg origins (absolute)\n", self._leg_ori_abs)
-        print("Leg origins (local):\n", self._leg_ori_loc)
+        # print("Leg origins (absolute)\n", self._leg_ori_abs)
+        # print("Leg origins (local):\n", self._leg_ori_loc)
 
     # Rolls the body. Body absolute and relative coordinates change.
     def body_roll(self, roll):
         self._roll = roll
         newvals = np.copy(self._leg_ori_abs)
-        newvals[:,2] = self._body_z + self.OFFSET_ROLL*np.sin(to_rads(self._roll))
-        newvals[:,1] = self.OFFSET_ROLL*np.cos(to_rads(self._roll))
+        newvals[:,2] = self._body_z + self.OFFSET_ROLL*np.sin(-to_rads(self._roll))
+        newvals[:,1] = self.OFFSET_ROLL*np.cos(-to_rads(self._roll))
         self.set_leg_ori_abs(newvals)
 
     # Pitches the body. Body absolute and relative coordinates change.
     def body_pitch(self, pitch):
         self._pitch = pitch
         newvals = np.copy(self._leg_ori_abs)
-        newvals[:,2] = self._body_z + self.OFFSET_PITCH*np.sin(to_rads(self._pitch))
-        newvals[:,0] = self.OFFSET_PITCH*np.cos(to_rads(self._pitch))
+        newvals[:,2] = self._body_z + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch))
+        newvals[:,0] = self.OFFSET_PITCH*np.cos(-to_rads(self._pitch))
         self.set_leg_ori_abs(newvals)
 
     # Rotates the body (relative). Body absolute and relative coordinates change, but leg does not.
@@ -362,13 +382,13 @@ class hexapod:
         self._yaw = theta
         angles = self.OFFSET_ANGLE + theta
         distances = pythagoras( self._leg_ori_abs[:, 0:2] )
-        print("Angles:", angles)
-        print("Distances:", distances)
+        # print("Absolute Origin Angles:", angles)
+        # print("Absolute Origin Distances:", distances)
         newvals = np.copy(self._leg_ori_abs)
-
+        # Rotation happens here
         newvals[:, 0] = distances * np.cos( to_rads( angles ) )
         newvals[:, 1] = distances * np.sin( to_rads( angles ) )
-        print("new values:\n", newvals)
+        # print("New absolute origins after rotation:\n", newvals)
 
         self.set_leg_ori_abs(newvals)
 
@@ -379,8 +399,9 @@ class hexapod:
         self.set_leg_ori_abs(new_vals)
 
     def body_translate_y_absolute(self, y):
-        required_y = self.OFFSET_ROLL + y
-        self._leg_ori_abs[:, 1] = required_y
+        new_vals = np.copy(self._leg_ori_abs)
+        new_vals[:, 1] = self.OFFSET_ROLL + y
+        self.set_leg_ori_abs(new_vals)
 
     def body_translate_x(self, x):
         self._leg_ori_abs[:, 0] += x
@@ -409,18 +430,10 @@ class hexapod:
             self.legs[i].swing(self._leg_end_loc[i])
     
     # Origin moves but leg does not.
-    # Use absolute (but offset) positions for leg stance!
     def update_legs_stance(self):
-        # leg_ori_towrite = np.copy(self._leg_ori_abs)
-        # leg_ori_towrite[:, 0] -= self.OFFSET_PITCH
-        # leg_ori_towrite[:, 1] -= self.OFFSET_ROLL
         leg_ori_towrite = np.copy(self._leg_ori_loc)
-        
-        # print(leg_ori_towrite)
-
         for i in range(len(self.legs)):
             self.legs[i].stance(leg_ori_towrite[i])
-        # Don't forget to recenter after getting somewhere
 
     def get_leg_end_loc(self):
         return self._leg_end_loc

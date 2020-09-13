@@ -10,6 +10,10 @@ leg_angles = np.tile(90.0, 6)  # leg angle init
 # print(leg_end_coords, leg_end_coords.shape)
 walky = hexapod.hexapod(leg_end_loc=leg_end_coords, leg_angle=leg_angles)
 
+amplitude = 32
+TEST_DUR = 6.0
+TIME_DELTA = 0.0
+
 print("Walkybot initial status:")
 walky.print_state()
 for leg in walky.legs:
@@ -26,75 +30,136 @@ def reset(delay):
     walky.update_legs_stance()
     time.sleep(delay)
 
-amplitude = 15
+########################################################
+# Roll test
+start_time = time.time()
+curr_time = 0.0
+print("\n\n//////////////ROLL test//////////////\n")
+while curr_time < TEST_DUR:
+    freq = 1/(time.time()-start_time-curr_time)
+    curr_time = time.time() - start_time
+    roll = amplitude * np.sin(1*np.pi * curr_time)
 
-# # Roll test
-# start_time = time.time()
-# curr_time = 0.0
-# print("Roll test")
-# while curr_time < 6.0:
-#     freq = 1/(time.time()-start_time-curr_time)
-#     curr_time = time.time() - start_time
-#     roll = amplitude * np.sin(1*np.pi * curr_time)
-
-#     walky.body_roll(roll)
+    walky.body_roll(roll)
     
-#     # debug
-#     print("Current roll angle: %0.4f | time: %0.4f | freq: %0.4f" %(roll, curr_time, freq) )
-#     # walky.print_state()
-#     # for leg in walky.legs:
-#     #     leg.debug_print()
-#     # print("")
-#     walky.update_legs_stance()
-# reset(1)
-
-# # Pitch test
-# start_time = time.time()
-# curr_time = 0.0
-# print("Pitch test")
-# while curr_time < 6.0:
-#     freq = 1/(time.time()-start_time-curr_time)
-#     curr_time = time.time() - start_time
-#     pitch = amplitude * np.sin(1*np.pi * curr_time)
+    # debug
+    print("Current roll angle: %0.4f | time: %0.4f | freq: %0.4f" %(roll, curr_time, freq) )
+    # walky.print_state()
+    # for leg in walky.legs:
+    #     leg.debug_print()
+    # print("")
+    walky.update_legs_stance()
+    print("")
     
-#     walky.body_pitch(pitch)
 
-#     # debug
-#     print("Current pitch angle: %0.4f | time: %0.4f | freq: %0.4f" %(pitch, curr_time, freq) )
-#     # walky.print_state()
-#     # for leg in walky.legs:
-#         # leg.debug_print()
-#     # print("")
-#     walky.update_legs_stance()
-# reset(1)
+reset(1)
+input("Ok to go to next test?")
 
-# # Combined pitch and roll test
-# start_time = time.time()
-# curr_time = 0.0
-# print("Pitch and Roll test")
-# while curr_time < 4.0:
-#     freq = 1/(time.time()-start_time-curr_time)
-#     curr_time = time.time() - start_time
-#     pitch = amplitude * np.sin(1*np.pi * curr_time)
-#     roll = amplitude * np.cos(1*np.pi * curr_time)
+########################################################
+# Pitch test
+start_time = time.time()
+curr_time = 0.0
+print("\n\n//////////////PITCH test//////////////\n")
+while curr_time < TEST_DUR:
+    freq = 1/(time.time()-start_time-curr_time)
+    curr_time = time.time() - start_time
+    pitch = amplitude * np.sin(1*np.pi * curr_time)
+    
+    walky.body_pitch(pitch)
 
-#     walky.body_pitch(pitch)
-#     walky.body_roll(roll)
+    # debug
+    print("Current pitch angle: %0.4f | time: %0.4f | freq: %0.4f" %(pitch, curr_time, freq) )
+    # walky.print_state()
+    # for leg in walky.legs:
+        # leg.debug_print()
+    # print("")
+    walky.update_legs_stance()
+    print("")
+    
+reset(1)
+input("Ok to go to next test?")
 
-#     # debug
-#     print("Pitch angle: %0.4f | Roll angle: %0.4f | time: %0.4f | freq: %0.4f" %(pitch, roll, curr_time, freq) )
-#     # walky.print_state()
-#     # for leg in walky.legs:
-#         # leg.debug_print()
-#     # print("")
-#     walky.update_legs_stance()
+########################################################
+# z translation
+amplitude = 20
+start_z = walky._body_z
+start_time = time.time()
+curr_time = 0.0
+print("\n\n//////////////Z test//////////////\n")
+while curr_time < TEST_DUR:
+    freq = 1/(time.time()-start_time-curr_time)
+    curr_time = time.time() - start_time
+    z = amplitude * np.sin(1*np.pi * curr_time) + start_z
+    
+    walky.body_translate_z(z)
 
+    # debug
+    print("Current Z displacement: %0.4f | time: %0.4f | freq: %0.4f" %(z, curr_time, freq) )
+    # walky.print_state()
+    # for leg in walky.legs:
+        # leg.debug_print()
+    # print("")
+    walky.update_legs_stance()
+    print("")
+    
+reset(1)
+input("OK to go onto next test?")
+
+########################################################
+# x translation
+start_time = time.time()
+curr_time = 0.0
+print("\n\n//////////////X test//////////////\n")
+while curr_time < TEST_DUR:
+    freq = 1/(time.time()-start_time-curr_time)
+    curr_time = time.time() - start_time
+    x = amplitude * np.sin(0.5*np.pi * curr_time)
+    
+    print("Current X displacement: %0.4f | time: %0.4f | freq: %0.4f" %(x, curr_time, freq) )
+    walky.body_translate_x_absolute(x)
+    print("\n")
+    walky.update_legs_stance()
+    
+    # debug
+    # walky.print_state()
+    # for leg in walky.legs:
+    #     leg.debug_print()
+
+    # time.sleep(1)
+
+reset(1)
+input("Ok to go to next test?")
+
+########################################################
+# y translation
+start_time = time.time()
+curr_time = 0.0
+print("\n\n//////////////Y test//////////////\n")
+while curr_time < TEST_DUR:
+    freq = 1/(time.time()-start_time-curr_time)
+    curr_time = time.time() - start_time
+    y = amplitude * np.sin(0.5*np.pi * curr_time)
+    
+    # debug
+    print("Current Y displacement: %0.4f | time: %0.4f | freq: %0.4f" %(y, curr_time, freq) )
+    walky.body_translate_y_absolute(y)
+    # walky.print_state()
+    # for leg in walky.legs:
+        # leg.debug_print()
+    print("\n")
+    walky.update_legs_stance()
+    
+
+reset(1)
+input("Ok to go to next test?")
+
+########################################################
 # rotation test
 amplitude = 30
 start_time = time.time()
 curr_time = 0.0
-print("Rotation test")
-while curr_time < 12.0:
+print("\n\n//////////////Rotation test//////////////\n")
+while curr_time < TEST_DUR:
     freq = 1/(time.time()-start_time-curr_time)
     curr_time = time.time() - start_time
     angle = amplitude * np.sin(0.5*np.pi * curr_time)
@@ -110,68 +175,34 @@ while curr_time < 12.0:
     print("")
 
     walky.update_legs_stance()
+    
     # time.sleep(0.1)
 
 reset(1)
-input("")
-
-# x translation
-start_time = time.time()
-curr_time = 0.0
-print("X test")
-while curr_time < 6.0:
-    freq = 1/(time.time()-start_time-curr_time)
-    curr_time = time.time() - start_time
-    x = amplitude * np.sin(0.5*np.pi * curr_time)
-    
-    print("Current displacement: %0.4f | time: %0.4f | freq: %0.4f" %(x, curr_time, freq) )
-    walky.body_translate_x_absolute(x)
-    walky.update_legs_stance()
-    # debug
-    # walky.print_state()
-    # for leg in walky.legs:
-    #     leg.debug_print()
-    # print("")
-
-    # time.sleep(1)
-
 assert(0)
+input("Ok to go to next test?")
 
-# y translation
-start_time = time.time()
-curr_time = 0.0
-print("Y test")
-while curr_time < 6.0:
-    freq = 1/(time.time()-start_time-curr_time)
-    curr_time = time.time() - start_time
-    y = amplitude * np.sin(0.5*np.pi * curr_time)
-    
-    walky.body_translate_y_absolute(y)
 
-    # debug
-    print("Current displacement: %0.4f | time: %0.4f | freq: %0.4f" %(y, curr_time, freq) )
-    # walky.print_state()
-    # for leg in walky.legs:
-        # leg.debug_print()
-    # print("")
-    walky.update_legs_stance()
+########################################################
+# # Combined pitch and roll test
+# start_time = time.time()
+# curr_time = 0.0
+# print("Pitch and Roll test")
+# while curr_time < TEST_DUR:
+#     freq = 1/(time.time()-start_time-curr_time)
+#     curr_time = time.time() - start_time
+#     pitch = amplitude * np.sin(1*np.pi * curr_time)
+#     roll = amplitude * np.cos(1*np.pi * curr_time)
 
-# z translation
-start_z = walky._body_z
-start_time = time.time()
-curr_time = 0.0
-print("Z test")
-while curr_time < 6.0:
-    freq = 1/(time.time()-start_time-curr_time)
-    curr_time = time.time() - start_time
-    z = amplitude * np.sin(1*np.pi * curr_time) + start_z
-    
-    walky.body_translate_x(z)
+#     walky.body_pitch(pitch)
+#     walky.body_roll(roll)
 
-    # debug
-    print("Current displacement: %0.4f | time: %0.4f | freq: %0.4f" %(z, curr_time, freq) )
-    # walky.print_state()
-    # for leg in walky.legs:
-        # leg.debug_print()
-    # print("")
-    walky.update_legs_stance()
+#     # debug
+#     print("Pitch angle: %0.4f | Roll angle: %0.4f | time: %0.4f | freq: %0.4f" %(pitch, roll, curr_time, freq) )
+#     # walky.print_state()
+#     # for leg in walky.legs:
+#         # leg.debug_print()
+#     # print("")
+#     walky.update_legs_stance()
+# reset(1)
+# input("OK to go onto next test?")
