@@ -159,14 +159,18 @@ class hex_leg:
 
         return self._leg_angles
 
-    # Leg origin moves. Update leg end; after all, leg end is RELATIVE to leg origin (always 0,0,Z)
+    # Leg origin moves, leg end does not.
     def stance(self, leg_ori):
         diff = leg_ori - self._leg_ori
+        save_leg_end = self._leg_end
         self._leg_end += diff
-        # update leg origin also
-        self._leg_ori = leg_ori
+        self._leg_ori = leg_ori # update leg origin
 
-        return self.swing(self._leg_end)
+        angles = self.swing(self._leg_end)
+        
+        self._leg_end = save_leg_end
+
+        return angles
 
     # Sets leg angles arbitrarily and use FK to update leg end coordinates
     # assume swing: that leg origin z-height is const (modify tip z-height)
