@@ -17,6 +17,9 @@ except:
 
 if rdata==b'10':
     address=raddr[0]
+else:
+    print("Hexapod not found!")
+    sys.exit()
 
 s.sendto(b'DP',(address,ctrlport))
 d,a=s.recvfrom(4096)
