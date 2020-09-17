@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 from adafruit_servokit import ServoKit
+import time
 # Robot coordinate class
 # TODO include subclasses that correspond to individual legs.
 
@@ -306,27 +307,29 @@ class hexapod:
 
         self.legs = (leg_r1, leg_r2, leg_r3, leg_l3, leg_l2, leg_l1)
 
-    # TODO These need to be adjusted to compensate for the difference in 
-    # coordinate framing between leg and body.
     # Sets local value for leg tip, (updates abs values accordingly)
     def set_leg_end_loc(self, newval):
         self._leg_end_loc = newval
         self._leg_end_abs[:, 2] = self._leg_end_loc[:, 2] # Z is absolute
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        phi = 180-self.OFFSET_ANGLE-self._leg_angle
-        self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
-        self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
+        phi = self.OFFSET_ANGLE + self._leg_angle + self._yaw
+        self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len * np.cos(to_rads(phi))
+        self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len * np.sin(to_rads(phi))
+        # phi = 180-self.OFFSET_ANGLE-self._leg_angle
+        # self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
+        # self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
 
     # Sets absolute value for leg tip (updates local values accordingly)
     # Overwrites angle as well
+    # need to take into account yaw values too (?)
     def set_leg_end_abs(self, newval):
         self._leg_end_abs = newval
         self._leg_end_loc[:, 2] = self._leg_end_abs[:, 2] # Z is absolute
-        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2]
+        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
-        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE
-        self._leg_end_loc[:, 0] = leg_len[:, 0] * np.sin(to_rads(self._leg_angle))
-        self._leg_end_loc[:, 1] = leg_len[:, 1] * np.cos(to_rads(self._leg_angle))
+        self._leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) + self.OFFSET_ANGLE
+        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle))
+        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
 
     # TODO!
     # Sets value for leg (coxa) angle - should change both absolute and local
@@ -334,9 +337,36 @@ class hexapod:
     def set_leg_angle(self, newval):
         self._leg_angle = newval
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        phi = 180-self.OFFSET_ANGLE-self._leg_angle
-        self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
-        self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
+        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle))
+        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
+        self.set_leg_end_loc(self._leg_end_loc)
+        # phi = 180-self.OFFSET_ANGLE-self._leg_angle
+        # self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
+        # self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
+
+    def set_indiv_leg_end_loc(self, leg, newval):
+        self._leg_end_loc[leg] = newval
+        self._leg_end_abs[leg, 2] = self._leg_end_loc[leg, 2] # Z is absolute
+        leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
+        phi = self.OFFSET_ANGLE[leg] + self._leg_angle[leg] + self._yaw
+        self._leg_end_abs[leg, 0] = self._leg_ori_abs[leg, 0] + leg_len*np.cos(to_rads(phi))
+        self._leg_end_abs[leg, 1] = self._leg_ori_abs[leg, 1] + leg_len*np.sin(to_rads(phi))
+
+    def set_indiv_leg_end_abs(self, leg, newval):
+        self._leg_end_abs[leg] = newval
+        self._leg_end_loc[leg, 2] = self._leg_end_abs[leg, 2] # Z is absolute
+        delta_xy = self._leg_end_abs[leg, 0:2] - self._leg_ori_abs[leg, 0:2] # Difference in x-y coordinates from leg origin
+        leg_len = pythagoras(delta_xy)
+        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) + self.OFFSET_ANGLE
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
+
+    def set_indiv_leg_angle(self, leg, newval):
+        self._leg_angle[leg] = newval
+        leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
+        self.set_indiv_leg_end_loc(leg, self._leg_end_loc)
 
     # Sets value for leg origin (updates local values accordingly)
     def set_leg_ori_abs(self, newval):
@@ -450,10 +480,50 @@ class hexapod:
         self.update_indiv_leg(4)
         self.update_indiv_leg(5)
     
-    # First raises leg to a arbitrary place before placing it down
-    # This prevents leg dragging
-    def raised_swing(self):
+    # Umbrella function for movement.
+    # X +ve: forwards. -ve: backwards.
+    # Y +ve: right. -ve: left.
+    # Choose between ripple(slow), wave(med), and tripod(fast) gaits
+    def move_hexapod(self, speed_x, speed_y):
         pass
+
+    # First raises leg to a arbitrary place before placing it down.
+    # New value will be in absolute coordinates.
+    # This prevents leg dragging
+    def raised_swing_abs(self, leg, newval, delay=0.1):
+        # First calculate the midpoint bewteen current and future positions:
+        delta = newval - self._leg_end_abs[leg]
+        # Move to the midpoint
+        target_pos = np.copy(delta)
+        target_pos[0:2] /= 2
+        target_pos[2] = self._body_z - self.RAISE_OFFSET
+
+        self.set_indiv_leg_end_abs(leg, target_pos)
+        self.update_indiv_leg(leg)
+
+        time.sleep(delay)
+
+        self.set_indiv_leg_end_abs(leg, newval)
+        self.update_indiv_leg(leg)
+
+    # First raises leg to a arbitrary place before placing it down.
+    # New value will be in coordinates local to individual leg.
+    # This prevents leg dragging
+    def raised_swing_loc(self, leg, newval, delay=0.1):
+        # First calculate the midpoint bewteen current and future positions:
+        delta = newval - self._leg_end_loc[leg]
+        # Move to the midpoint
+        target_pos = np.copy(delta)
+        target_pos[0:2] /= 2
+        target_pos[2] = self._body_z - self.RAISE_OFFSET
+
+        self.set_indiv_leg_end_loc(leg, target_pos)
+        self.update_indiv_leg(leg)
+
+        time.sleep(delay)
+
+        self.set_indiv_leg_end_loc(leg, newval)
+        self.update_indiv_leg(leg)
 
     # Origin moves but leg does not.
     def update_legs_stance(self):
