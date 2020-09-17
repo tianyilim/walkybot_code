@@ -4,7 +4,7 @@ import sys
 ctrlport=34712
 sendBuffer=[]   #byte array to transmit
 
-s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # SOCK_DGRAM uses UDP packets 
 s.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
 s.bind((socket.gethostbyname(socket.gethostname()),42819))
 s.settimeout(2) #timeout in seconds

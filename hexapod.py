@@ -258,6 +258,7 @@ class hexapod:
     OFFSET_Z = np.tile(_body_z,6)
     OFFSET_ANGLE = np.array((30, 90, 150, 210, 270, 330), dtype='float32') # Modify angle offset for each
     OFFSET_ORIGINS = np.transpose((OFFSET_PITCH, OFFSET_ROLL,OFFSET_Z))
+    RAISE_OFFSET = 10 # Leg will raise to -10 from body height.
 
     # Addressing all legs
     legs = None
@@ -305,7 +306,9 @@ class hexapod:
 
         self.legs = (leg_r1, leg_r2, leg_r3, leg_l3, leg_l2, leg_l1)
 
-    # Sets local value for leg tip, and changes other relevant values
+    # TODO These need to be adjusted to compensate for the difference in 
+    # coordinate framing between leg and body.
+    # Sets local value for leg tip, (updates abs values accordingly)
     def set_leg_end_loc(self, newval):
         self._leg_end_loc = newval
         self._leg_end_abs[:, 2] = self._leg_end_loc[:, 2] # Z is absolute
@@ -314,7 +317,7 @@ class hexapod:
         self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
         self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len*np.cos(to_rads(phi))
 
-    # Sets absolute value for leg tip, and changes other relevant values
+    # Sets absolute value for leg tip (updates local values accordingly)
     # Overwrites angle as well
     def set_leg_end_abs(self, newval):
         self._leg_end_abs = newval
@@ -325,7 +328,9 @@ class hexapod:
         self._leg_end_loc[:, 0] = leg_len[:, 0] * np.sin(to_rads(self._leg_angle))
         self._leg_end_loc[:, 1] = leg_len[:, 1] * np.cos(to_rads(self._leg_angle))
 
-    # Sets value for leg angle - changes absolute leg positions(x,y) as well
+    # TODO!
+    # Sets value for leg (coxa) angle - should change both absolute and local
+    # leg positions(x,y) as well.
     def set_leg_angle(self, newval):
         self._leg_angle = newval
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
@@ -371,7 +376,7 @@ class hexapod:
         self._yaw += theta
         distances = pythagoras( self._leg_ori_abs[:, 0:2] )
         angles = to_degs(np.arctan2( self._leg_ori_abs[:, 1], self._leg_ori_abs[:, 0]))+theta
-        print("Angles:", angles)
+        # print("Angles:", angles)
 
         newvals = np.copy(self._leg_ori_abs)
         newvals[:, 0] = distances * np.cos( to_rads( angles ) )
@@ -392,7 +397,7 @@ class hexapod:
 
         self.set_leg_ori_abs(newvals)
 
-    # These translate by a certain value, not to an absolute value...
+    # These translate to an absolute value
     def body_translate_x_absolute(self, x):
         new_vals = np.copy(self._leg_ori_abs)
         new_vals[:, 0] = self.OFFSET_PITCH + x
@@ -403,16 +408,24 @@ class hexapod:
         new_vals[:, 1] = self.OFFSET_ROLL + y
         self.set_leg_ori_abs(new_vals)
 
+    def body_translate_z_absolute(self, z):
+        self._body_z = z
+        self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
+        self.body_roll(self._roll)
+
+    # These simply modify the value of the x/y/z coordinate
     def body_translate_x(self, x):
-        self._leg_ori_abs[:, 0] += x
-        # self._leg_ori_loc[:, 0] += x
+        new_vals = np.copy(self._leg_ori_abs)
+        new_vals[:, 0] += x
+        self.set_leg_ori_abs(new_vals)
 
     def body_translate_y(self, y):
-        self._leg_ori_abs[:, 1] += y
-        # self._leg_ori_loc[:, 1] += y
+        new_vals = np.copy(self._leg_ori_abs)
+        new_vals[:, 1] += y
+        self.set_leg_ori_abs(new_vals)
 
     def body_translate_z(self, z):
-        self._body_z = z
+        self._body_z += z
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
         self.body_roll(self._roll)
 
@@ -424,11 +437,24 @@ class hexapod:
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
         self.body_roll(self._roll)
     
+    # Allows for the individual updating of legs
+    def update_indiv_leg(self, leg):
+        self.legs[leg].swing(self._leg_end_loc[leg])
+
     # Writing updated coordinates to the legs. Legs move but origin does not.
     def update_legs_swing(self):
-        for i in range(len(self.legs)):
-            self.legs[i].swing(self._leg_end_loc[i])
+        self.update_indiv_leg(0)
+        self.update_indiv_leg(1)
+        self.update_indiv_leg(2)
+        self.update_indiv_leg(3)
+        self.update_indiv_leg(4)
+        self.update_indiv_leg(5)
     
+    # First raises leg to a arbitrary place before placing it down
+    # This prevents leg dragging
+    def raised_swing(self):
+        pass
+
     # Origin moves but leg does not.
     def update_legs_stance(self):
         leg_ori_towrite = np.copy(self._leg_ori_loc)
