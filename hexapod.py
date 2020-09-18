@@ -3,8 +3,6 @@ import warnings
 from adafruit_servokit import ServoKit
 import time
 # Robot coordinate class
-# TODO include subclasses that correspond to individual legs.
-
 # Constants
 
 # Helper functions
@@ -14,28 +12,6 @@ def to_degs(num):
     return num*180/np.pi
 def pythagoras(nums):
     return np.sqrt(np.sum(np.power(nums, 2), axis=1))
-# def get_quadrant(num):
-#     while 0 <= num <= 360:
-#         if num > 360:
-#             num -= 360
-#         if num < 0:
-#             num += 360
-    
-#     if 0 <= num <= 90:
-#         print("A")
-#         return 1
-#     elif 90 < num <= 180:
-#         print("S")
-#         return 2
-#     elif 180 < num <= 270:
-#         print("T")
-#         return 3
-#     elif 270 < num <= 360:
-#         print("C")
-#         return 4
-#     else:
-#         print(num, "error")
-#         return 0
 
 # Class for legs and joints
 class leg_joint:
@@ -112,6 +88,7 @@ class hex_leg:
     COXA_LEN = 28.75
     FEMUR_LEN = 40.0
     TIBIA_LEN = 68.825
+    LEG_ORI_START = np.array((0.0, 0.0, 68.825))
 
     def __init__(self, leg_end, leg_ori_z, leg_nums, servoKit, leg_name, left_right,
                 limits=(45.0, 70.0, 80.0), offsets=(0.0, 0.0, 0.0) ):
@@ -148,7 +125,6 @@ class hex_leg:
             self.joints[2].writeAngle( self._leg_angles[2])
     
     # Leg tip moves, leg origin does not
-    # This is wrong?
     def swing(self, leg_end):
         self._leg_end = leg_end
 
@@ -185,13 +161,14 @@ class hex_leg:
 
     # Leg origin moves, leg end does not.
     def stance(self, leg_ori):
-        diff = leg_ori - self._leg_ori
+        diff = leg_ori - self.LEG_ORI_START
+        # print("Curr origin:", self._leg_ori, "Diff:", diff)
         save_leg_end = self._leg_end
-        self._leg_ori = leg_ori # update leg origin
-
         angles = self.swing(self._leg_end-diff) # Moving chassis +x units means moving leg -x units
-        self._leg_end = save_leg_end
 
+        self._leg_ori = leg_ori # update leg origin
+        self._leg_end = save_leg_end
+        # print("Update origin:", self._leg_ori, "Update tip:", self._leg_end)
         return angles
 
     # Sets leg angles arbitrarily and use FK to update leg end coordinates
@@ -287,6 +264,8 @@ class hexapod:
             print("Only local or absolute coordinates for leg tips should be given!")
         else:
             self.set_leg_end_loc(leg_end_loc)
+
+        np.set_printoptions(precision=3, suppress=True) # print prettier
 
         # Init all six legs
         leftServos = ServoKit(channels=16, address=0x42)
@@ -385,11 +364,11 @@ class hexapod:
         # print("Leg origins (absolute)\n", self._leg_ori_abs)
         # print("Leg origins (local):\n", self._leg_ori_loc)
 
-    # Rolls the body. Body absolute and relative coordinates change.
+    # Rolls the body. Body absolute and relative coordinates change. Call this before any other functions!
     def body_roll(self, roll):
         self._roll = roll
         newvals = np.copy(self._leg_ori_abs)
-        newvals[:,2] = self._body_z + self.OFFSET_ROLL*np.sin(-to_rads(self._roll))
+        newvals[:,2] = self._body_z + self.OFFSET_ROLL*np.sin(-to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch))
         newvals[:,1] = self.OFFSET_ROLL*np.cos(-to_rads(self._roll))
         self.set_leg_ori_abs(newvals)
 
@@ -397,7 +376,7 @@ class hexapod:
     def body_pitch(self, pitch):
         self._pitch = pitch
         newvals = np.copy(self._leg_ori_abs)
-        newvals[:,2] = self._body_z + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch))
+        newvals[:,2] = self._body_z + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch)) + self.OFFSET_ROLL*np.sin(-to_rads(self._roll))
         newvals[:,0] = self.OFFSET_PITCH*np.cos(-to_rads(self._pitch))
         self.set_leg_ori_abs(newvals)
 
@@ -407,7 +386,6 @@ class hexapod:
         distances = pythagoras( self._leg_ori_abs[:, 0:2] )
         angles = to_degs(np.arctan2( self._leg_ori_abs[:, 1], self._leg_ori_abs[:, 0]))+theta
         # print("Angles:", angles)
-
         newvals = np.copy(self._leg_ori_abs)
         newvals[:, 0] = distances * np.cos( to_rads( angles ) )
         newvals[:, 1] = distances * np.sin( to_rads( angles ) )
@@ -424,7 +402,6 @@ class hexapod:
         newvals[:, 0] = distances * np.cos( to_rads( angles ) )
         newvals[:, 1] = distances * np.sin( to_rads( angles ) )
         # print("New absolute origins after rotation:\n", newvals)
-
         self.set_leg_ori_abs(newvals)
 
     # These translate to an absolute value
@@ -439,7 +416,14 @@ class hexapod:
         self.set_leg_ori_abs(new_vals)
 
     def body_translate_z_absolute(self, z):
-        self._body_z = z
+        if z < 30:
+            warnings.warn("Exceeded minimum Z-height")
+            self._body_z = 30.0
+        elif z > 100:
+            warnings.warn("Exceeded maximum Z-height")
+            self._body_z = 100.0
+        else:
+            self._body_z = z
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
         self.body_roll(self._roll)
 
@@ -455,7 +439,16 @@ class hexapod:
         self.set_leg_ori_abs(new_vals)
 
     def body_translate_z(self, z):
-        self._body_z += z
+        try_z = self._body_z + z
+        if try_z < 30:
+            warnings.warn("Exceeded minimum Z-height")
+            self._body_z = 30.0
+        elif try_z > 100:
+            warnings.warn("Exceeded maximum Z-height")
+            self._body_z = 100.0
+        else:
+            self._body_z = try_z
+            
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
         self.body_roll(self._roll)
 
@@ -526,10 +519,14 @@ class hexapod:
         self.update_indiv_leg(leg)
 
     # Origin moves but leg does not.
+    # TODO update in this order: FEMUR, TIBIA, COXA
     def update_legs_stance(self):
-        leg_ori_towrite = np.copy(self._leg_ori_loc)
+        # leg_ori_towrite = np.copy(self._leg_ori_loc)
         for i in range(len(self.legs)):
-            self.legs[i].stance(leg_ori_towrite[i])
+            # self.legs[i].stance(leg_ori_towrite[i])
+            # print("Leg",i,"writing:",self._leg_ori_loc[i])
+            self.legs[i].stance(self._leg_ori_loc[i])
+            # print("Leg", i, "Writing", self._leg_ori_loc[i], "Gets", self.legs[i].stance(self._leg_ori_loc[i]) )
 
     def get_leg_end_loc(self):
         return self._leg_end_loc

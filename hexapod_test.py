@@ -10,9 +10,9 @@ leg_angles = np.tile(90.0, 6)  # leg angle init
 # print(leg_end_coords, leg_end_coords.shape)
 walky = hexapod.hexapod(leg_end_loc=leg_end_coords, leg_angle=leg_angles)
 
-amplitude = 32
-TEST_DUR = 6.0
-TIME_DELTA = 0.0
+amplitude = 30
+TEST_DUR = 8.0
+TIME_DELTA = 0.05
 
 print("Walkybot initial status:")
 walky.print_state()
@@ -38,19 +38,16 @@ print("\n\n//////////////ROLL test//////////////\n")
 while curr_time < TEST_DUR:
     freq = 1/(time.time()-start_time-curr_time)
     curr_time = time.time() - start_time
-    roll = amplitude * np.sin(1*np.pi * curr_time)
+    roll = amplitude * np.sin(0.25*np.pi * curr_time)
 
     walky.body_roll(roll)
-    
     # debug
     print("Current roll angle: %0.4f | time: %0.4f | freq: %0.4f" %(roll, curr_time, freq) )
     # walky.print_state()
     # for leg in walky.legs:
     #     leg.debug_print()
-    # print("")
-    walky.update_legs_stance()
     print("")
-    
+    walky.update_legs_stance()
 
 reset(1)
 input("Ok to go to next test?")
@@ -63,7 +60,7 @@ print("\n\n//////////////PITCH test//////////////\n")
 while curr_time < TEST_DUR:
     freq = 1/(time.time()-start_time-curr_time)
     curr_time = time.time() - start_time
-    pitch = amplitude * np.sin(1*np.pi * curr_time)
+    pitch = amplitude * np.sin(0.25*np.pi * curr_time)
     
     walky.body_pitch(pitch)
 
@@ -71,17 +68,16 @@ while curr_time < TEST_DUR:
     print("Current pitch angle: %0.4f | time: %0.4f | freq: %0.4f" %(pitch, curr_time, freq) )
     # walky.print_state()
     # for leg in walky.legs:
-        # leg.debug_print()
-    # print("")
-    walky.update_legs_stance()
+    #     leg.debug_print()
     print("")
+    walky.update_legs_stance()
     
 reset(1)
 input("Ok to go to next test?")
 
 ########################################################
 # z translation
-amplitude = 20
+amplitude = 30
 start_z = walky._body_z
 start_time = time.time()
 curr_time = 0.0
@@ -89,9 +85,9 @@ print("\n\n//////////////Z test//////////////\n")
 while curr_time < TEST_DUR:
     freq = 1/(time.time()-start_time-curr_time)
     curr_time = time.time() - start_time
-    z = amplitude * np.sin(1*np.pi * curr_time) + start_z
+    z = amplitude * np.sin(0.25*np.pi * curr_time) + start_z
     
-    walky.body_translate_z(z)
+    walky.body_translate_z_absolute(z)
 
     # debug
     print("Current Z displacement: %0.4f | time: %0.4f | freq: %0.4f" %(z, curr_time, freq) )
@@ -100,7 +96,6 @@ while curr_time < TEST_DUR:
         # leg.debug_print()
     # print("")
     walky.update_legs_stance()
-    print("")
     
 reset(1)
 input("OK to go onto next test?")
@@ -117,7 +112,6 @@ while curr_time < TEST_DUR:
     
     print("Current X displacement: %0.4f | time: %0.4f | freq: %0.4f" %(x, curr_time, freq) )
     walky.body_translate_x_absolute(x)
-    print("\n")
     walky.update_legs_stance()
     
     # debug
@@ -146,7 +140,6 @@ while curr_time < TEST_DUR:
     # walky.print_state()
     # for leg in walky.legs:
         # leg.debug_print()
-    print("\n")
     walky.update_legs_stance()
     
 
@@ -172,7 +165,6 @@ while curr_time < TEST_DUR:
     # for leg in walky.legs:
     #     leg.joints[0].debug_print()
     # walky.legs[0].debug_print()
-    print("")
 
     walky.update_legs_stance()
     
