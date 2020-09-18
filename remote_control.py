@@ -15,8 +15,8 @@ tilt = [0,0]
 rotate = 0
 updown = 0
 
-target_name = "raspberrypi.local" # Check this
-target_port = 10000
+target_name = "192.168.1.141" # Check this
+target_port = 10240
 server_address = (target_name, target_port)
 
 def int_twosComp(val, bits=8):
@@ -82,10 +82,10 @@ def transmitInput(target_params):
         sent = sock.sendto(data, target_params)
         
         # Debug
-        print("Sent %s bytes" %sent)
-        for i, x in enumerate(data):
-            print(i, int_twosComp(x) )
-        time.sleep(0.01) # Don't need to update so often
+        # print("Sent %s bytes" %sent)
+        # for i, x in enumerate(data):
+        #     print(i, int_twosComp(x) )
+        time.sleep(0.1) # Don't need to update so often
     
 print("Starting stuff")
 inputThread = Thread(target=controllerInput)
