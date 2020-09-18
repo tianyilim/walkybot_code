@@ -5,6 +5,7 @@ import sys      #for placeholders
 
 ctrlport=34712
 dataport =34710
+dest_addr = "localhost"
 recvBufferSize=4096
 recvBuffer=[]   #buffer for received data (array of bytes)
 dataFlag=0  #flag to signal that new data has been received 
@@ -22,7 +23,7 @@ def controlPortHandler(cport=34712):
 
 def dataPortHandler(dport=34710,dbuff=4096):
     dsock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    dsock.bind(('',dport))
+    dsock.bind((dest_addr,dport))
     while 1:
         ddata,daddr=dsock.recvfrom(dbuff)
         recvBuffer=list(ddata)
