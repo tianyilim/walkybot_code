@@ -114,7 +114,6 @@ class hex_leg:
         # print("\nmoving servos!")
         # debug
         # self.debug_print()
-
         if self.left_right_mult == True:
             self.joints[0].writeAngle( self._leg_angles[0])
             self.joints[1].writeAngle( self._leg_angles[1])
@@ -156,29 +155,31 @@ class hex_leg:
     
         arg1 = (femur_len_ik**2 + l_len**2 - tibia_len_ik**2) / (2*femur_len_ik*l_len)
         arg2 = (femur_len_ik**2 - l_len**2 + tibia_len_ik**2) / (2*femur_len_ik*tibia_len_ik)
+        # print(arg1, arg2)
 
         # Error catching
-        if -1 < arg1 < 1 or -1 < arg2 < 1:
-            warnings.warn("For leg %s, position is not possible" %self.leg_name)
+        if (-1.0 <= arg1 <= 1.0) or (-1.0 <= arg2 <= 1.0):
+            femur_angle_ik1 = np.arccos( z_offset_ik / l_len )
+            femur_angle_ik2 = np.arccos( arg1 )
+            femur_angle_ik = femur_angle_ik1 + femur_angle_ik2
+            tibia_angle_ik = np.arccos( arg2 )
+
+            # print("femur_angle_ik1: %0.4f | femur_angle_ik2: %0.4f | femur_angle_ik: %0.4f | tibia_angle_ik: %0.4f" %(femur_angle_ik1, femur_angle_ik2, femur_angle_ik, tibia_angle_ik))
+            # print("femur_angle_ik: %0.4f | tibia_angle_ik: %0.4f" %(femur_angle_ik, tibia_angle_ik))
+
+            # Update current values (Should skip if returned false)
+            self._leg_end = leg_end
+            self._leg_angles = np.array( (to_degs(coxa_angle_ik)+90, to_degs(femur_angle_ik), to_degs(tibia_angle_ik)) )
+            # self.writeAngles() # Don't write angles just yet
+            
+            # print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
+
+            return True
+
+        else:
+            warnings.warn("%s, position is not possible" %(self.leg_name))
             return False
         
-        # print(arg1, arg2)
-        femur_angle_ik1 = np.arccos( z_offset_ik / l_len )
-        femur_angle_ik2 = np.arccos( arg1 )
-        femur_angle_ik = femur_angle_ik1 + femur_angle_ik2
-        tibia_angle_ik = np.arccos( arg2 )
-
-        # print("femur_angle_ik1: %0.4f | femur_angle_ik2: %0.4f | femur_angle_ik: %0.4f | tibia_angle_ik: %0.4f" %(femur_angle_ik1, femur_angle_ik2, femur_angle_ik, tibia_angle_ik))
-        # print("femur_angle_ik: %0.4f | tibia_angle_ik: %0.4f" %(femur_angle_ik, tibia_angle_ik))
-
-        # Update current values
-        self._leg_end = leg_end
-        self._leg_angles = np.array( (to_degs(coxa_angle_ik)+90, to_degs(femur_angle_ik), to_degs(tibia_angle_ik)) )
-        # self.writeAngles() # Don't write angles just yet
-        
-        # print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
-
-        return True
 
     # Leg origin moves, leg end does not.
     def stance(self, leg_ori):
@@ -311,8 +312,8 @@ class hexapod:
                         left_right='left', leg_name="leg_l3", offsets=(10,10,0))
 
         self.legs = (leg_r1, leg_r2, leg_r3, leg_l3, leg_l2, leg_l1)
-        self.legset1 = (leg_r1, leg_r3, leg_l2, 1, 3, 5)
-        self.legset2 = (leg_r2, leg_l3, leg_l1, 2, 4, 6)
+        self.legset1 = (leg_r1, leg_r3, leg_l2, 0, 2, 4)
+        self.legset2 = (leg_r2, leg_l3, leg_l1, 1, 3, 5)
         self.time_ref = time.time() # Start time of epoch - used for smoothing out motions
 
     # Sets local value for leg tip, (updates abs values accordingly)
@@ -320,7 +321,7 @@ class hexapod:
         self._leg_end_loc = newval
         self._leg_end_abs[:, 2] = self._leg_end_loc[:, 2] # Z is absolute
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        phi = self.OFFSET_ANGLE + self._leg_angle + self._yaw
+        phi = self.OFFSET_ANGLE + (self._leg_angle-90.0) + self._yaw
         self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len * np.cos(to_rads(phi))
         self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len * np.sin(to_rads(phi))
         # phi = 180-self.OFFSET_ANGLE-self._leg_angle
@@ -330,12 +331,15 @@ class hexapod:
     # Sets absolute value for leg tip (updates local values accordingly)
     # Overwrites angle as well
     # need to take into account yaw values too (?)
+    # TODO FIX this tomorrow.
     def set_leg_end_abs(self, newval):
         self._leg_end_abs = newval
         self._leg_end_loc[:, 2] = self._leg_end_abs[:, 2] # Z is absolute
         delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
-        self._leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) + self.OFFSET_ANGLE
+        print("delta_xy:", delta_xy, "leg_len:", leg_len)
+        self._leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) - self.OFFSET_ANGLE + 90.0
+        print("Leg angles:\n", self._leg_angle)
         self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle))
         self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
 
@@ -344,8 +348,8 @@ class hexapod:
     def set_leg_angle(self, newval):
         self._leg_angle = newval
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle))
-        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
+        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle-90.0))
+        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle-90.0))
         self.set_leg_end_loc(self._leg_end_loc)
         # phi = 180-self.OFFSET_ANGLE-self._leg_angle
         # self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
@@ -355,7 +359,7 @@ class hexapod:
         self._leg_end_loc[leg] = newval
         self._leg_end_abs[leg, 2] = self._leg_end_loc[leg, 2] # Z is absolute
         leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        phi = self.OFFSET_ANGLE[leg] + self._leg_angle[leg] + self._yaw
+        phi = self.OFFSET_ANGLE[leg] + self._leg_angle[leg] - 90.0 + self._yaw
         self._leg_end_abs[leg, 0] = self._leg_ori_abs[leg, 0] + leg_len*np.cos(to_rads(phi))
         self._leg_end_abs[leg, 1] = self._leg_ori_abs[leg, 1] + leg_len*np.sin(to_rads(phi))
 
@@ -364,15 +368,15 @@ class hexapod:
         self._leg_end_loc[leg, 2] = self._leg_end_abs[leg, 2] # Z is absolute
         delta_xy = self._leg_end_abs[leg, 0:2] - self._leg_ori_abs[leg, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
-        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) + self.OFFSET_ANGLE
-        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]))
-        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
+        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE + 90.0
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]-90.0))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]-90.0))
 
     def set_indiv_leg_angle(self, leg, newval):
         self._leg_angle[leg] = newval
         leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]))
-        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]-90.0))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]-90.0))
         self.set_indiv_leg_end_loc(leg, self._leg_end_loc)
 
     # Sets value for leg origin (updates local values accordingly)
@@ -514,17 +518,23 @@ class hexapod:
         delta_x = (speed_x/127)*MAX_STEP
         delta_y = (speed_y/127)*MAX_STEP
         delta_yaw = (speed_rotation/127)*MAX_ROTATE
+        print("Delta_X: %0.4f | Delta_Y: %0.4f | Delta_R: %0.4f" %(delta_x, delta_y, delta_yaw))
 
         # Simple translation
         newvals = np.copy(self._leg_end_abs)
         newvals[:,0] += delta_x
         newvals[:,1] += delta_y
-        # Rotate these leg end coords
-        angles = self.OFFSET_ANGLE + delta_yaw
-        distances = pythagoras( newvals[:, 0:2] )
-        # Rotation happens here
-        newvals[:, 0] = distances * np.cos( to_rads( angles ) )
-        newvals[:, 1] = distances * np.sin( to_rads( angles ) )
+        print("New coords to move to bef rotation:\n", newvals, '\n')
+
+        # ROTATION DOES NOT WORK YET
+        # # Rotate these leg end coords
+        # angles = self.OFFSET_ANGLE + delta_yaw
+        # distances = pythagoras( newvals[:, 0:2] )
+        # # Rotation happens here
+        # newvals[:, 0] = distances * np.cos( to_rads( angles ) )
+        # newvals[:, 1] = distances * np.sin( to_rads( angles ) )
+
+        # print("New coords to move to:\n", newvals)
 
         # Calculate vals for legset1
         legset1_coords = np.array((newvals[0], self._leg_end_abs[1], newvals[2], self._leg_end_abs[3], newvals[4], self._leg_end_abs[5]))
@@ -549,6 +559,8 @@ class hexapod:
         target_pos[:,0:2] = delta[:,0:2]/2 + self._leg_end_abs[:,0:2]
         target_pos[:,2] = self._body_z + self.RAISE_OFFSET
 
+        print("Target move pos:\n", target_pos)
+
         start_pos = np.copy(self._leg_end_abs)
         gradient = (target_pos - self._leg_end_abs) / move_time # Gradient is the rate of movement in each axis(xyz) wrt time.
         
@@ -556,7 +568,9 @@ class hexapod:
         t = 0.0
         while t < move_time:
             # Calculate position on the movement path
+            print("Time:", t, "Curr movement pos:\n", (start_pos + gradient*t) )
             self.set_leg_end_abs( start_pos + gradient*t ) # Move legs WRT time...
+            print("Local leg coords:\n", self._leg_end_loc)
             self.update_legs_swing(legset)
             t = time.time() - self.time_ref
 
@@ -570,26 +584,25 @@ class hexapod:
             self.set_leg_end_abs( start_pos + gradient*t ) # Move legs WRT time...
             self.update_legs_swing(legset)
             t = time.time() - self.time_ref
-
         
-    # First raises leg to a arbitrary place before placing it down.
-    # New value will be in coordinates local to individual leg.
-    # This prevents leg dragging
-    def raised_swing_loc(self, leg, newval, delay=0.1):
-        # First calculate the midpoint bewteen current and future positions:
-        delta = newval - self._leg_end_loc[leg]
-        # Move to the midpoint
-        target_pos = np.copy(delta)
-        target_pos[0:2] /= 2
-        target_pos[2] = self._body_z - self.RAISE_OFFSET
+    # # First raises leg to a arbitrary place before placing it down.
+    # # New value will be in coordinates local to individual leg.
+    # # This prevents leg dragging
+    # def raised_swing_loc(self, leg, newval, delay=0.1):
+    #     # First calculate the midpoint bewteen current and future positions:
+    #     delta = newval - self._leg_end_loc[leg]
+    #     # Move to the midpoint
+    #     target_pos = np.copy(delta)
+    #     target_pos[0:2] /= 2
+    #     target_pos[2] = self._body_z - self.RAISE_OFFSET
 
-        self.set_indiv_leg_end_loc(leg, target_pos)
-        self.update_indiv_leg(leg)
+    #     self.set_indiv_leg_end_loc(leg, target_pos)
+    #     self.update_indiv_leg(leg)
 
-        time.sleep(delay)
+    #     time.sleep(delay)
 
-        self.set_indiv_leg_end_loc(leg, newval)
-        self.update_indiv_leg(leg)
+    #     self.set_indiv_leg_end_loc(leg, newval)
+    #     self.update_indiv_leg(leg)
 
     # Origin moves but leg does not.
     def update_legs_stance(self):
@@ -603,10 +616,13 @@ class hexapod:
     
     # actually writes the angles into the motors (in order!)
     def write_leg_angles(self):
+        # print("Writing Femur")
         for i in range(len(self.legs)):
             self.legs[i].writeFemur()
+        # print("Writing Tibia")
         for i in range(len(self.legs)):
             self.legs[i].writeTibia()
+        # print("Writing Coxa")
         for i in range(len(self.legs)):
             self.legs[i].writeCoxa()
 
