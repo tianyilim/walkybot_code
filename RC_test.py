@@ -58,6 +58,7 @@ while True:
         # print("Tilt values:", tilt)
         # print("Rotate:", rotate)
 
+        
         walky.body_pitch(tilt[0])
         walky.body_roll(tilt[1])
         walky.body_translate_z(updown*4)

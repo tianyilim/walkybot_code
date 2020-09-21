@@ -123,11 +123,24 @@ class hex_leg:
             self.joints[0].writeAngle( self._leg_angles[0])
             self.joints[1].writeAngle( 180-self._leg_angles[1])
             self.joints[2].writeAngle( self._leg_angles[2])
+
+    def writeCoxa(self):
+        self.joints[0].writeAngle( self._leg_angles[0])
     
+    def writeFemur(self):
+        if self.left_right_mult == True:
+            self.joints[1].writeAngle( self._leg_angles[1])
+        else:
+            self.joints[1].writeAngle( 180-self._leg_angles[1])
+
+    def writeTibia(self):
+        if self.left_right_mult == True:
+            self.joints[2].writeAngle( 180-self._leg_angles[2])
+        else:
+            self.joints[2].writeAngle( self._leg_angles[2])
+
     # Leg tip moves, leg origin does not
     def swing(self, leg_end):
-        self._leg_end = leg_end
-
         coxa_angle_ik = np.arctan2(leg_end[0], leg_end[1]) # 'gamma' in notes
 
         coxa_len_ik = self.COXA_LEN * np.cos( coxa_angle_ik ) # Takes side view of this thing.
@@ -141,35 +154,45 @@ class hex_leg:
         # print("z_offset_ik: %0.4f | y_offset_ik: %0.4f | l_len: %0.4f" %(z_offset_ik, y_offset_ik, l_len) )
         # print("coxa_len_ik: %0.4f | femur_len_ik: %0.4f | tibia_len_ik: %0.4f" %(coxa_len_ik, femur_len_ik, tibia_len_ik))
     
-        # arg1 = (femur_len_ik**2 + l_len**2 - tibia_len_ik**2) / (2*femur_len_ik*l_len)
-        # arg2 = (femur_len_ik**2 - l_len**2 + tibia_len_ik**2) / (2*femur_len_ik*tibia_len_ik)
+        arg1 = (femur_len_ik**2 + l_len**2 - tibia_len_ik**2) / (2*femur_len_ik*l_len)
+        arg2 = (femur_len_ik**2 - l_len**2 + tibia_len_ik**2) / (2*femur_len_ik*tibia_len_ik)
+
+        # Error catching
+        if -1 < arg1 < 1 or -1 < arg2 < 1:
+            warnings.warn("For leg %s, position is not possible" %self.leg_name)
+            return False
+        
         # print(arg1, arg2)
         femur_angle_ik1 = np.arccos( z_offset_ik / l_len )
-        femur_angle_ik2 = np.arccos( (femur_len_ik**2 + l_len**2 - tibia_len_ik**2) / (2*femur_len_ik*l_len) )
+        femur_angle_ik2 = np.arccos( arg1 )
         femur_angle_ik = femur_angle_ik1 + femur_angle_ik2
-        tibia_angle_ik = np.arccos( (femur_len_ik**2 - l_len**2 + tibia_len_ik**2) / (2*femur_len_ik*tibia_len_ik) )
+        tibia_angle_ik = np.arccos( arg2 )
 
         # print("femur_angle_ik1: %0.4f | femur_angle_ik2: %0.4f | femur_angle_ik: %0.4f | tibia_angle_ik: %0.4f" %(femur_angle_ik1, femur_angle_ik2, femur_angle_ik, tibia_angle_ik))
         # print("femur_angle_ik: %0.4f | tibia_angle_ik: %0.4f" %(femur_angle_ik, tibia_angle_ik))
 
+        # Update current values
+        self._leg_end = leg_end
         self._leg_angles = np.array( (to_degs(coxa_angle_ik)+90, to_degs(femur_angle_ik), to_degs(tibia_angle_ik)) )
-        self.writeAngles()
+        # self.writeAngles() # Don't write angles just yet
         
         # print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
 
-        return self._leg_angles
+        return True
 
     # Leg origin moves, leg end does not.
     def stance(self, leg_ori):
         diff = leg_ori - self.LEG_ORI_START
         # print("Curr origin:", self._leg_ori, "Diff:", diff)
         save_leg_end = self._leg_end
-        angles = self.swing(self._leg_end-diff) # Moving chassis +x units means moving leg -x units
-
+        swing_success = self.swing(self._leg_end-diff)
         self._leg_ori = leg_ori # update leg origin
-        self._leg_end = save_leg_end
+        self._leg_end = save_leg_end # Do not modify leg origin
+        if swing_success is True:
+            return True
+        else:
+            return False
         # print("Update origin:", self._leg_ori, "Update tip:", self._leg_end)
-        return angles
 
     # Sets leg angles arbitrarily and use FK to update leg end coordinates
     # assume swing: that leg origin z-height is const (modify tip z-height)
@@ -226,6 +249,7 @@ class hexapod:
     _roll = 0.0
     _pitch = 0.0
     _yaw = 0.0
+    time_ref = 0.0
 
     # body parameters
     X0_LEN = 45.768
@@ -240,6 +264,8 @@ class hexapod:
 
     # Addressing all legs
     legs = None
+    legset1 = None
+    legset2 = None
     
     def __init__(self, leg_end_loc=None, leg_ori_loc=None, leg_end_abs=None, 
                 leg_angle=np.array((90.0, 90.0, 90.0, 90.0, 90.0, 90.0)), body_z=68.825, roll=0.0, pitch=0.0):
@@ -285,6 +311,9 @@ class hexapod:
                         left_right='left', leg_name="leg_l3", offsets=(10,10,0))
 
         self.legs = (leg_r1, leg_r2, leg_r3, leg_l3, leg_l2, leg_l1)
+        self.legset1 = (leg_r1, leg_r3, leg_l2, 1, 3, 5)
+        self.legset2 = (leg_r2, leg_l3, leg_l1, 2, 4, 6)
+        self.time_ref = time.time() # Start time of epoch - used for smoothing out motions
 
     # Sets local value for leg tip, (updates abs values accordingly)
     def set_leg_end_loc(self, newval):
@@ -310,7 +339,6 @@ class hexapod:
         self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle))
         self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
 
-    # TODO!
     # Sets value for leg (coxa) angle - should change both absolute and local
     # leg positions(x,y) as well.
     def set_leg_angle(self, newval):
@@ -460,45 +488,90 @@ class hexapod:
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
         self.body_roll(self._roll)
     
-    # Allows for the individual updating of legs
+    # Allows for the individual updating of legs by leg index
     def update_indiv_leg(self, leg):
         self.legs[leg].swing(self._leg_end_loc[leg])
 
     # Writing updated coordinates to the legs. Legs move but origin does not.
-    def update_legs_swing(self):
-        self.update_indiv_leg(0)
-        self.update_indiv_leg(1)
-        self.update_indiv_leg(2)
-        self.update_indiv_leg(3)
-        self.update_indiv_leg(4)
-        self.update_indiv_leg(5)
+    def update_legs_swing(self, legset=None):
+        if legset is None:
+            for i in range(len(self.legs)):
+                self.legs[i].swing(self._leg_end_loc[i])
+        else:
+            for x in legset[3:6]:
+                self.legs[x].swing(self._leg_end_loc[x])
+
+        # Write leg angles after calculating them!
+        self.write_leg_angles()
     
     # Umbrella function for movement.
     # X +ve: forwards. -ve: backwards.
     # Y +ve: right. -ve: left.
     # Choose between ripple(slow), wave(med), and tripod(fast) gaits
-    def move_hexapod(self, speed_x, speed_y):
-        pass
+    # Max step is the biggest diff coordinates allowed
+    def move_hexapod(self, speed_x, speed_y, speed_rotation, MAX_STEP=30.0, MAX_ROTATE=30.0):
+        # First, legset1 moves...
+        delta_x = (speed_x/127)*MAX_STEP
+        delta_y = (speed_y/127)*MAX_STEP
+        delta_yaw = (speed_rotation/127)*MAX_ROTATE
+
+        # Simple translation
+        newvals = np.copy(self._leg_end_abs)
+        newvals[:,0] += delta_x
+        newvals[:,1] += delta_y
+        # Rotate these leg end coords
+        angles = self.OFFSET_ANGLE + delta_yaw
+        distances = pythagoras( newvals[:, 0:2] )
+        # Rotation happens here
+        newvals[:, 0] = distances * np.cos( to_rads( angles ) )
+        newvals[:, 1] = distances * np.sin( to_rads( angles ) )
+
+        # Calculate vals for legset1
+        legset1_coords = np.array((newvals[0], self._leg_end_abs[1], newvals[2], self._leg_end_abs[3], newvals[4], self._leg_end_abs[5]))
+        self.raised_swing_abs(self.legset1, legset1_coords)
+        # Calculate vals for legset2
+        legset2_coords = np.array((self._leg_end_abs[0], newvals[1], self._leg_end_abs[2], newvals[3], self._leg_end_abs[4], newvals[5]))
+        self.raised_swing_abs(self.legset2, legset2_coords)
+        
+        # Calculate vals for body coordinates
+        self.body_rotate_absolute(delta_yaw)
+        self.update_legs_stance()
 
     # First raises leg to a arbitrary place before placing it down.
     # New value will be in absolute coordinates.
     # This prevents leg dragging
-    def raised_swing_abs(self, leg, newval, delay=0.1):
+    def raised_swing_abs(self, legset, newval, speed=2.0):
+        move_time = 1/speed # Time taken for one swing movement
         # First calculate the midpoint bewteen current and future positions:
-        delta = newval - self._leg_end_abs[leg]
+        delta = newval - self._leg_end_abs
         # Move to the midpoint
         target_pos = np.copy(delta)
-        target_pos[0:2] /= 2
-        target_pos[2] = self._body_z - self.RAISE_OFFSET
+        target_pos[:,0:2] = delta[:,0:2]/2 + self._leg_end_abs[:,0:2]
+        target_pos[:,2] = self._body_z + self.RAISE_OFFSET
 
-        self.set_indiv_leg_end_abs(leg, target_pos)
-        self.update_indiv_leg(leg)
+        start_pos = np.copy(self._leg_end_abs)
+        gradient = (target_pos - self._leg_end_abs) / move_time # Gradient is the rate of movement in each axis(xyz) wrt time.
+        
+        self.time_ref = time.time() # Update start time here
+        t = 0.0
+        while t < move_time:
+            # Calculate position on the movement path
+            self.set_leg_end_abs( start_pos + gradient*t ) # Move legs WRT time...
+            self.update_legs_swing(legset)
+            t = time.time() - self.time_ref
 
-        time.sleep(delay)
+        # Reset parameters for moving downwards
+        start_pos = np.copy(self._leg_end_abs)
+        gradient = (newval - self._leg_end_abs) / move_time # Gradient is the rate of movement in each axis(xyz) wrt time.
+        self.time_ref = time.time() # Update start time here
+        t = 0.0
+        while t < move_time:
+            # Calculate position on the movement path
+            self.set_leg_end_abs( start_pos + gradient*t ) # Move legs WRT time...
+            self.update_legs_swing(legset)
+            t = time.time() - self.time_ref
 
-        self.set_indiv_leg_end_abs(leg, newval)
-        self.update_indiv_leg(leg)
-
+        
     # First raises leg to a arbitrary place before placing it down.
     # New value will be in coordinates local to individual leg.
     # This prevents leg dragging
@@ -519,7 +592,6 @@ class hexapod:
         self.update_indiv_leg(leg)
 
     # Origin moves but leg does not.
-    # TODO update in this order: FEMUR, TIBIA, COXA
     def update_legs_stance(self):
         # leg_ori_towrite = np.copy(self._leg_ori_loc)
         for i in range(len(self.legs)):
@@ -527,6 +599,17 @@ class hexapod:
             # print("Leg",i,"writing:",self._leg_ori_loc[i])
             self.legs[i].stance(self._leg_ori_loc[i])
             # print("Leg", i, "Writing", self._leg_ori_loc[i], "Gets", self.legs[i].stance(self._leg_ori_loc[i]) )
+        self.write_leg_angles()
+    
+    # actually writes the angles into the motors (in order!)
+    def write_leg_angles(self):
+        for i in range(len(self.legs)):
+            self.legs[i].writeFemur()
+        for i in range(len(self.legs)):
+            self.legs[i].writeTibia()
+        for i in range(len(self.legs)):
+            self.legs[i].writeCoxa()
+
 
     def get_leg_end_loc(self):
         return self._leg_end_loc
