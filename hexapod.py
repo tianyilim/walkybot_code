@@ -249,7 +249,7 @@ class hexapod:
     _leg_end_abs = np.zeros((6,3)) # absolute coordinates
     _leg_ori_abs = np.zeros((6,3))
     _leg_angle = np.zeros(6) # Each leg's coxa angle (gamma)
-    _body_z = 68.825 # Body origin (0,0,z)
+    _body_center = np.array(0.0, 0.0, 68.825)
     _roll = 0.0
     _pitch = 0.0
     _yaw = 0.0
@@ -261,7 +261,7 @@ class hexapod:
     Y1_LEN = 52.848
     OFFSET_ROLL = np.array((Y0_LEN, Y1_LEN, Y0_LEN, -Y0_LEN, -Y1_LEN, -Y0_LEN)) # Roll modifies Z based on y-coord
     OFFSET_PITCH = np.array((X0_LEN, 0.0, -X0_LEN, -X0_LEN, 0.0, X0_LEN)) # Pitch modifies Z based on x-coord
-    OFFSET_Z = np.tile(_body_z,6)
+    OFFSET_Z = np.tile(_body_center[2],6)
     OFFSET_ANGLE = np.array((30, 90, 150, 210, 270, 330), dtype='float32') # Modify angle offset for each
     OFFSET_ORIGINS = np.transpose((OFFSET_PITCH, OFFSET_ROLL,OFFSET_Z))
     RAISE_OFFSET = 20 # Leg will raise to 20 from the ground
@@ -275,12 +275,12 @@ class hexapod:
                 leg_angle=np.array((90.0, 90.0, 90.0, 90.0, 90.0, 90.0)), body_z=68.825, roll=0.0, pitch=0.0):
 
         self._leg_angle = leg_angle # initialise these constants
-        self._body_z = body_z
+        self._body_center[2] = body_z
         self._roll = roll
         self._pitch = pitch
 
         # Set leg origins based on roll and pitch settings
-        self._leg_ori_loc[:, 2] = self._body_z + self.OFFSET_ROLL*np.sin(to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(self._pitch))
+        self._leg_ori_loc[:, 2] = self._body_center[2] + self.OFFSET_ROLL*np.sin(to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(self._pitch))
         self._leg_ori_abs[:, 2] = self._leg_ori_loc[:, 2]
         self._leg_ori_abs[:, 0] = self.OFFSET_PITCH*np.cos(to_rads(self._pitch))
         self._leg_ori_abs[:, 1] = self.OFFSET_ROLL*np.cos(to_rads(self._roll))
@@ -320,28 +320,34 @@ class hexapod:
         self.time_ref = time.time() # Start time of epoch - used for smoothing out motions
 
     # Sets local value for leg tip, (updates abs values accordingly)
-    def set_leg_end_loc(self, newval, write=True):
-        leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        phi = self.OFFSET_ANGLE + np.arctan2(-newval[:,0], newval[:,1])
+    def set_leg_end_loc(self, newval, leg_index=None, write=True):
+        if leg_index is None:
+            leg_index = (0,1,2,3,4,5)
+
+        leg_len = pythagoras(self._leg_end_loc[leg_index, 0:2])
+        phi = self.OFFSET_ANGLE[leg_index] + np.arctan2(-newval[:,0], newval[:,1])
         retval = np.copy(newval)
-        retval[:, 0] = self._leg_ori_abs[:, 0] + leg_len * np.cos(to_rads(phi))
-        retval[:, 1] = self._leg_ori_abs[:, 1] + leg_len * np.sin(to_rads(phi))
+        retval[:, 0] = self._leg_ori_abs[leg_index, 0] + leg_len * np.cos(to_rads(phi))
+        retval[:, 1] = self._leg_ori_abs[leg_index, 1] + leg_len * np.sin(to_rads(phi))
 
         if write:
-            self._leg_end_loc = newval
-            self._leg_end_abs = retval
-            self._leg_angle = phi
+            self._leg_end_loc[leg_index] = newval
+            self._leg_end_abs[leg_index] = retval
+            self._leg_angle[leg_index] = phi
         
         return retval
 
     # Sets absolute value for leg tip (updates local values accordingly)
     # Overwrites angle as well
     # need to take into account yaw values too (?)
-    def set_leg_end_abs(self, newval, write=True):
-        delta_xy = newval[:, 0:2] - self._leg_ori_abs[:, 0:2] # Difference in x-y coordinates from leg origin
+    def set_leg_end_abs(self, newval, leg_index=None, write=True):
+        if leg_index is None:
+            leg_index = (0,1,2,3,4,5)
+
+        delta_xy = newval[:, 0:2] - self._leg_ori_abs[leg_index, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
         # print("delta_xy:\n", delta_xy, "\nleg_len:", leg_len)
-        leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) - self.OFFSET_ANGLE
+        leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) - self.OFFSET_ANGLE[leg_index]
         # normalise angles
         for angle in leg_angle:
             if (-360-45) <= angle <= (-360+45):
@@ -350,13 +356,13 @@ class hexapod:
                 angle -= 360
         # print("Leg angles:\n", self._leg_angle)
         retval = np.copy(newval)
-        retval[:, 0] = leg_len * np.sin(to_rads(-leg_angle)) + self._leg_ori_loc[:,0]
-        retval[:, 1] = leg_len * np.cos(to_rads(leg_angle)) + self._leg_ori_loc[:,1]
+        retval[:, 0] = leg_len * np.sin(to_rads(-leg_angle)) + self._leg_ori_loc[leg_index,0]
+        retval[:, 1] = leg_len * np.cos(to_rads(leg_angle)) + self._leg_ori_loc[leg_index,1]
 
         if write:
-            self._leg_end_abs = newval
-            self._leg_end_loc = retval
-            self._leg_angle = leg_angle
+            self._leg_end_abs[leg_index] = newval
+            self._leg_end_loc[leg_index] = retval
+            self._leg_angle[leg_index] = leg_angle
 
         return retval
 
@@ -439,7 +445,7 @@ class hexapod:
     def body_roll(self, roll):
         self._roll = roll
         newvals = np.copy(self._leg_ori_abs)
-        newvals[:,2] = self._body_z + self.OFFSET_ROLL*np.sin(-to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch))
+        newvals[:,2] = self._body_center[2] + self.OFFSET_ROLL*np.sin(-to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch))
         newvals[:,1] = self.OFFSET_ROLL*np.cos(-to_rads(self._roll))
         self.set_leg_ori_abs(newvals)
 
@@ -447,7 +453,7 @@ class hexapod:
     def body_pitch(self, pitch):
         self._pitch = pitch
         newvals = np.copy(self._leg_ori_abs)
-        newvals[:,2] = self._body_z + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch)) + self.OFFSET_ROLL*np.sin(-to_rads(self._roll))
+        newvals[:,2] = self._body_center[2] + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch)) + self.OFFSET_ROLL*np.sin(-to_rads(self._roll))
         newvals[:,0] = self.OFFSET_PITCH*np.cos(-to_rads(self._pitch))
         self.set_leg_ori_abs(newvals)
 
@@ -479,22 +485,24 @@ class hexapod:
     def body_translate_x_absolute(self, x):
         new_vals = np.copy(self._leg_ori_abs)
         new_vals[:, 0] = self.OFFSET_PITCH + x
+        self._body_center[0] += x
         self.set_leg_ori_abs(new_vals)
 
     def body_translate_y_absolute(self, y):
         new_vals = np.copy(self._leg_ori_abs)
         new_vals[:, 1] = self.OFFSET_ROLL + y
+        self._body_center[1] += y
         self.set_leg_ori_abs(new_vals)
 
     def body_translate_z_absolute(self, z):
         if z < 30:
             warnings.warn("Exceeded minimum Z-height")
-            self._body_z = 30.0
+            self._body_center[2] = 30.0
         elif z > 100:
             warnings.warn("Exceeded maximum Z-height")
-            self._body_z = 100.0
+            self._body_center[2] = 100.0
         else:
-            self._body_z = z
+            self._body_center[2] = z
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
         self.body_roll(self._roll)
 
@@ -510,15 +518,15 @@ class hexapod:
         self.set_leg_ori_abs(new_vals)
 
     def body_translate_z(self, z):
-        try_z = self._body_z + z
+        try_z = self._body_center[2] + z
         if try_z < 30:
             warnings.warn("Exceeded minimum Z-height")
-            self._body_z = 30.0
+            self._body_center[2] = 30.0
         elif try_z > 100:
             warnings.warn("Exceeded maximum Z-height")
-            self._body_z = 100.0
+            self._body_center[2] = 100.0
         else:
-            self._body_z = try_z
+            self._body_center[2] = try_z
             
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
         self.body_roll(self._roll)
@@ -526,6 +534,7 @@ class hexapod:
     # Recenters origin coordinates back to (0,0) - after successfully moving?
     def body_recenter(self):
         self._leg_ori_abs[:,0:2] = 0.0
+        self._body_center = np.array((0.0,0.0,68.825))
         self._leg_ori_loc[:,0] = self.OFFSET_PITCH
         self._leg_ori_loc[:,1] = self.OFFSET_ROLL
         self.body_pitch(self._pitch) # Updates z-height, then for the other stuff.
@@ -535,17 +544,41 @@ class hexapod:
     def swing_leg_indiv(self, leg):
         self.legs[leg].swing(self._leg_end_loc[leg])
 
-    # calculates the required final positions of <legs> based on delta x/y, and rotation
-    def move_legs(self, leg_index, dx, dy, rot, speed=2.0):
-        
+    # calculates the required final positions of <legs> based on delta x/y, and rotation angle (theta)
+    # Pass in a TUPLE (,) for leg_index!
+    def move_legs(self, leg_index, dx, dy, theta, speed=2.0):
         move_time = 1/speed
-        
-        mid_loc
+
+        # Calculate the movement required
+        delta = np.tile((dx,dy,0.0), (1,len(leg_index)))
+        endpoints = np.take(self._leg_end_abs, leg_index, axis=0) # Takes the relevant slices of the coord array.
+        endpoints[:,0] += dx
+        endpoints[:,1] += dy
+        # Rotate (about shifted body center)
+        ctr = np.copy(self._body_center) + delta
+        rot_dist = endpoints-ctr
+        leg_len = pythagoras(rot_dist[0:2])
+        angles = self.OFFSET_ANGLE + theta
+        endpoints[:, 0] = leg_len * np.cos( to_rads( angles ) )
+        endpoints[:, 1] = leg_len * np.sin( to_rads( angles ) )
+
+        # calculate a movement plan
+        im_pos = np.copy(delta) # Intermediate position
+        im_pos[:,0:2] = delta[:,0:2]/2 + self._leg_end_abs[leg_index,0:2] # goes to the midpoint 
+        im_pos[:,2] = self.RAISE_OFFSET
+
+        grad_up = (im_pos - self._leg_end_abs[leg_index]) / move_time
+        grad_down = (endpoints - im_pos) / move_time
 
         time_ref = time.time() # Move legs in a pseudo-linear fashion
         t = time.time()-time_ref
-        while t < move_time:
-
+        while t < move_time*2:
+            # move upwards
+            if t < move_time:
+                
+            # move downwards to endpoint
+            else:
+                
 
     # Writing updated coordinates to the legs. Legs move but origin does not.
     def update_legs_swing(self, legset=None):
@@ -719,8 +752,8 @@ class hexapod:
         return self._leg_ori_abs
     def get_leg_angle(self):
         return self._leg_angle
-    def get_body_z(self):
-        return self._body_z
+    def get_body_center(self):
+        return self._body_center
 
     def print_state(self): # Sanity check
         np.set_printoptions(precision=3, suppress=True) # print prettier
@@ -729,7 +762,7 @@ class hexapod:
         print("Local leg origin:\n", self._leg_ori_loc)
         print("Abs leg origin:\n", self._leg_ori_abs)
         print("Leg Angles:\n", self._leg_angle)
-        print("Body Z-height:", self._body_z)
+        print("Body Center:", self._body_center)
         print("Body roll:", self._roll)
         print("Body pitch:", self._pitch)
         print("") # give a newline
