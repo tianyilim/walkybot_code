@@ -124,15 +124,18 @@ class hex_leg:
             self.joints[2].writeAngle( self._leg_angles[2])
 
     def writeCoxa(self):
+        # print("%s coxa commanded angle: %0.4f" %(self.leg_name, self._leg_angles[0]))
         self.joints[0].writeAngle( self._leg_angles[0])
     
     def writeFemur(self):
+        # print("%s femur commanded angle: %0.4f" %(self.leg_name, self._leg_angles[1]))
         if self.left_right_mult == True:
             self.joints[1].writeAngle( self._leg_angles[1])
         else:
             self.joints[1].writeAngle( 180-self._leg_angles[1])
 
     def writeTibia(self):
+        # print("%s tibia commanded angle: %0.4f" %(self.leg_name, self._leg_angles[2]))
         if self.left_right_mult == True:
             self.joints[2].writeAngle( 180-self._leg_angles[2])
         else:
@@ -245,7 +248,7 @@ class hexapod:
     _leg_ori_loc = np.zeros((6,3)) # local coordinates of leg origins (local to each leg)
     _leg_end_abs = np.zeros((6,3)) # absolute coordinates
     _leg_ori_abs = np.zeros((6,3))
-    _leg_angle = np.zeros(6) # Each leg's coxa angle (gamma) - in the leg frame. Default is 0.0
+    _leg_angle = np.zeros(6) # Each leg's coxa angle (gamma)
     _body_z = 68.825 # Body origin (0,0,z)
     _roll = 0.0
     _pitch = 0.0
@@ -261,7 +264,7 @@ class hexapod:
     OFFSET_Z = np.tile(_body_z,6)
     OFFSET_ANGLE = np.array((30, 90, 150, 210, 270, 330), dtype='float32') # Modify angle offset for each
     OFFSET_ORIGINS = np.transpose((OFFSET_PITCH, OFFSET_ROLL,OFFSET_Z))
-    RAISE_OFFSET = 10 # Leg will raise to -10 from body height.
+    RAISE_OFFSET = 20 # Leg will raise to 20 from the ground
 
     # Addressing all legs
     legs = None
@@ -269,7 +272,7 @@ class hexapod:
     legset2 = None
     
     def __init__(self, leg_end_loc=None, leg_ori_loc=None, leg_end_abs=None, 
-                leg_angle=np.array((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), body_z=68.825, roll=0.0, pitch=0.0):
+                leg_angle=np.array((90.0, 90.0, 90.0, 90.0, 90.0, 90.0)), body_z=68.825, roll=0.0, pitch=0.0):
 
         self._leg_angle = leg_angle # initialise these constants
         self._body_z = body_z
@@ -321,7 +324,7 @@ class hexapod:
         self._leg_end_loc = newval
         self._leg_end_abs[:, 2] = self._leg_end_loc[:, 2] # Z is absolute
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        phi = self.OFFSET_ANGLE + self._leg_angle + self._yaw
+        phi = self.OFFSET_ANGLE + (self._leg_angle-90.0) + self._yaw
         self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len * np.cos(to_rads(phi))
         self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len * np.sin(to_rads(phi))
         # phi = 180-self.OFFSET_ANGLE-self._leg_angle
@@ -334,14 +337,20 @@ class hexapod:
     def set_leg_end_abs(self, newval):
         self._leg_end_abs = newval
         self._leg_end_loc[:, 2] = self._leg_end_abs[:, 2] # Z is absolute
-        # Calc dist of leg from base (final-initial)
-        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2]
+        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2] # Difference in x-y coordinates from leg origin
+        # deltax = delta_xy[:,0]
+        # deltay = delta_xy[:,1]
+
         leg_len = pythagoras(delta_xy)
-        print("delta_xy:", delta_xy, "leg_len:", leg_len)
-        # Find angle of leg
+        # print("delta_xy:\n", delta_xy, "\nleg_len:", leg_len)
         self._leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) - self.OFFSET_ANGLE
-        print("Leg angles:\n", self._leg_angle)
-        # calculate xy values (Offset by their initial val)
+        # normalise angles
+        for i in range(len(self._leg_angle)):
+            if (-360-45) <= self._leg_angle[i] <= (-360+45):
+                self._leg_angle[i] += 360
+            elif (360-45) <= self._leg_angle[i] <= (360+45):
+                self._leg_angle[i] -= 360
+        # print("Leg angles:\n", self._leg_angle)
         self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(-self._leg_angle)) + self._leg_ori_loc[:,0]
         self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle)) + self._leg_ori_loc[:,1]
 
@@ -350,8 +359,8 @@ class hexapod:
     def set_leg_angle(self, newval):
         self._leg_angle = newval
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(-self._leg_angle))
-        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
+        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle-90.0))
+        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle-90.0))
         self.set_leg_end_loc(self._leg_end_loc)
         # phi = 180-self.OFFSET_ANGLE-self._leg_angle
         # self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
@@ -361,7 +370,7 @@ class hexapod:
         self._leg_end_loc[leg] = newval
         self._leg_end_abs[leg, 2] = self._leg_end_loc[leg, 2] # Z is absolute
         leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        phi = self.OFFSET_ANGLE[leg] + self._leg_angle[leg] + self._yaw
+        phi = self.OFFSET_ANGLE[leg] + self._leg_angle[leg] - 90.0 + self._yaw
         self._leg_end_abs[leg, 0] = self._leg_ori_abs[leg, 0] + leg_len*np.cos(to_rads(phi))
         self._leg_end_abs[leg, 1] = self._leg_ori_abs[leg, 1] + leg_len*np.sin(to_rads(phi))
 
@@ -370,15 +379,19 @@ class hexapod:
         self._leg_end_loc[leg, 2] = self._leg_end_abs[leg, 2] # Z is absolute
         delta_xy = self._leg_end_abs[leg, 0:2] - self._leg_ori_abs[leg, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
-        self._leg_angle[leg] = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE
-        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(-self._leg_angle[leg]))
-        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
+        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE + 90.0
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]-90.0))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]-90.0))
 
     def set_indiv_leg_angle(self, leg, newval):
         self._leg_angle[leg] = newval
         leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(-self._leg_angle[leg]))
-        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
+        if self._leg_angle[leg] <= -360:
+            self._leg_angle[leg] += 360
+        elif self._leg_angle[leg] >= 360:
+            self._leg_angle[leg] -= 360
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]-90.0))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]-90.0))
         self.set_indiv_leg_end_loc(leg, self._leg_end_loc)
 
     # Sets value for leg origin (updates local values accordingly)
@@ -506,7 +519,6 @@ class hexapod:
         else:
             for x in legset[3:6]:
                 self.legs[x].swing(self._leg_end_loc[x])
-
         # Write leg angles after calculating them!
         self.write_leg_angles()
     
@@ -541,25 +553,46 @@ class hexapod:
         # Calculate vals for legset1
         legset1_coords = np.array((newvals[0], self._leg_end_abs[1], newvals[2], self._leg_end_abs[3], newvals[4], self._leg_end_abs[5]))
         self.raised_swing_abs(self.legset1, legset1_coords)
+
+        print("Legset 1 done")
+        time.sleep(1)
+
         # Calculate vals for legset2
         legset2_coords = np.array((self._leg_end_abs[0], newvals[1], self._leg_end_abs[2], newvals[3], self._leg_end_abs[4], newvals[5]))
         self.raised_swing_abs(self.legset2, legset2_coords)
         
+        print("Legset 2 done")
+        time.sleep(1)
+
+        # Move body
+        body_target = np.copy(self._leg_ori_abs)
+        body_target[:,0] += delta_x
+        body_target[:,1] += delta_y
+        self.shift_body(body_target)
+
         # Calculate vals for body coordinates
-        self.body_rotate_absolute(delta_yaw)
-        self.update_legs_stance()
+        # self.body_rotate_absolute(delta_yaw)
+        # self.update_legs_stance()
+                
+        print("Body Stance done")
+        time.sleep(1)
+
+        self.body_recenter()
+
 
     # First raises leg to a arbitrary place before placing it down.
     # New value will be in absolute coordinates.
     # This prevents leg dragging
     def raised_swing_abs(self, legset, newval, speed=2.0):
+        legset_index = legset[3:6]
+
         move_time = 1/speed # Time taken for one swing movement
         # First calculate the midpoint bewteen current and future positions:
         delta = newval - self._leg_end_abs
         # Move to the midpoint
         target_pos = np.copy(delta)
-        target_pos[:,0:2] = delta[:,0:2]/2 + self._leg_end_abs[:,0:2]
-        target_pos[:,2] = self._body_z + self.RAISE_OFFSET
+        target_pos[:,0:2] = delta[:,0:2]/4 + self._leg_end_abs[:,0:2]
+        target_pos[legset_index,2] = self.RAISE_OFFSET
 
         print("Target move pos:\n", target_pos)
 
@@ -570,12 +603,16 @@ class hexapod:
         t = 0.0
         while t < move_time:
             # Calculate position on the movement path
-            print("Time:", t, "Curr movement pos:\n", (start_pos + gradient*t) )
+            print("Time:", t, "\nCurr movement pos:\n", (start_pos + gradient*t) )
             self.set_leg_end_abs( start_pos + gradient*t ) # Move legs WRT time...
             print("Local leg coords:\n", self._leg_end_loc)
             self.update_legs_swing(legset)
             t = time.time() - self.time_ref
-
+        
+        self.set_leg_end_abs( target_pos ) # Move legs WRT time...
+        self.update_legs_swing(legset)
+        print("Move up complete\n\n")
+        print("Target move pos:\n", newval)
         # Reset parameters for moving downwards
         start_pos = np.copy(self._leg_end_abs)
         gradient = (newval - self._leg_end_abs) / move_time # Gradient is the rate of movement in each axis(xyz) wrt time.
@@ -583,28 +620,30 @@ class hexapod:
         t = 0.0
         while t < move_time:
             # Calculate position on the movement path
+            print("Time:", t, "\nCurr movement pos:\n", (start_pos + gradient*t) )
             self.set_leg_end_abs( start_pos + gradient*t ) # Move legs WRT time...
+            print("Local leg coords:\n", self._leg_end_loc)
             self.update_legs_swing(legset)
             t = time.time() - self.time_ref
+        self.set_leg_end_abs( start_pos + gradient*t ) # Move legs WRT time...
+        self.update_legs_swing(legset)
+        print("Movement complete\n\n####################################\n\n")
+
         
-    # # First raises leg to a arbitrary place before placing it down.
-    # # New value will be in coordinates local to individual leg.
-    # # This prevents leg dragging
-    # def raised_swing_loc(self, leg, newval, delay=0.1):
-    #     # First calculate the midpoint bewteen current and future positions:
-    #     delta = newval - self._leg_end_loc[leg]
-    #     # Move to the midpoint
-    #     target_pos = np.copy(delta)
-    #     target_pos[0:2] /= 2
-    #     target_pos[2] = self._body_z - self.RAISE_OFFSET
-
-    #     self.set_indiv_leg_end_loc(leg, target_pos)
-    #     self.update_indiv_leg(leg)
-
-    #     time.sleep(delay)
-
-    #     self.set_indiv_leg_end_loc(leg, newval)
-    #     self.update_indiv_leg(leg)
+    def shift_body(self, newval, speed=2.0):
+        move_time = 1/speed
+        start_pos = np.copy(self._leg_ori_abs)
+        gradient = (newval - self._leg_end_abs) / move_time # Gradient is the rate of movement in each axis(xyz) wrt time.
+        
+        self.time_ref = time.time() # Update start time here
+        t = 0.0
+        while t < move_time:
+            # Calculate position on the movement path
+            print("Time:", t, "\nCurr movement pos:\n", (start_pos + gradient*t) )
+            self.set_leg_ori_abs( start_pos + gradient*t ) # Move legs WRT time...
+            print("Local ori coords:\n", self._leg_ori_loc)
+            self.update_legs_stance()
+            t = time.time() - self.time_ref
 
     # Origin moves but leg does not.
     def update_legs_stance(self):

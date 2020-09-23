@@ -6,7 +6,7 @@ import time
 
 # initialise hexapod object
 leg_end_coords = np.tile((0.0, 68.75, 0.0), (6,1)) # check back
-leg_angles = np.tile(0.0, 6)  # leg angle init
+leg_angles = np.tile(90.0, 6)  # leg angle init
 # print(leg_end_coords, leg_end_coords.shape)
 walky = hexapod.hexapod(leg_end_loc=leg_end_coords, leg_angle=leg_angles)
 
@@ -30,7 +30,19 @@ def reset(delay):
     walky.update_legs_stance()
     time.sleep(delay)
 
-walky.move_hexapod(50, 0, 0)
+# Starting pose of all leg tips
+newvals = np.array(((105.307,60.799,0.0), (0.0,121.598,0.0), (-105.307,60.799,0.0),
+                    (-105.307,-60.799,0.0), (-0.0,-121.598,0.0), (105.307,-60.799,0.0)))
+
+newvals[:,0] += 10
+
+# walky.set_leg_end_abs(newvals)
+start_time = time.time()
+curr_time = 0.0
+print("\n\n//////////////WALK test//////////////\n")
+while curr_time < TEST_DUR:
+    walky.move_hexapod(127, 0, 0)
+
 
 # ########################################################
 # # Roll test
