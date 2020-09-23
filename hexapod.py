@@ -320,10 +320,7 @@ class hexapod:
         self.time_ref = time.time() # Start time of epoch - used for smoothing out motions
 
     # Sets local value for leg tip, (updates abs values accordingly)
-    def set_leg_end_loc(self, newval, leg_index=None, write=True):
-        if leg_index is None:
-            leg_index = (0,1,2,3,4,5)
-
+    def set_leg_end_loc(self, newval, leg_index=(0,1,2,3,4,5), write=True):
         leg_len = pythagoras(self._leg_end_loc[leg_index, 0:2])
         phi = self.OFFSET_ANGLE[leg_index] + np.arctan2(-newval[:,0], newval[:,1])
         retval = np.copy(newval)
@@ -340,10 +337,7 @@ class hexapod:
     # Sets absolute value for leg tip (updates local values accordingly)
     # Overwrites angle as well
     # need to take into account yaw values too (?)
-    def set_leg_end_abs(self, newval, leg_index=None, write=True):
-        if leg_index is None:
-            leg_index = (0,1,2,3,4,5)
-
+    def set_leg_end_abs(self, newval, leg_index=(0,1,2,3,4,5), write=True):
         delta_xy = newval[:, 0:2] - self._leg_ori_abs[leg_index, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
         # print("delta_xy:\n", delta_xy, "\nleg_len:", leg_len)
@@ -368,10 +362,7 @@ class hexapod:
 
     # Sets value for leg (coxa) angle - should change both absolute and local
     # leg positions(x,y) as well.
-    def set_leg_angle(self, newval, leg_index=None, write=True):
-        if leg_index is None:
-            leg_index = (0,1,2,3,4,5)
-        
+    def set_leg_angle(self, newval, leg_index=(0,1,2,3,4,5), write=True):        
         leg_len = pythagoras(self._leg_end_loc[leg_index, 0:2])
         retval = np.copy(self._leg_end_loc[leg_index])
         retval[0] = leg_len * np.sin(to_rads(-newval))
@@ -383,52 +374,6 @@ class hexapod:
             self._leg_angle[leg_index] = newval
         
         return self.set_leg_end_loc(retval, leg_index=leg_index, write=write)
-
-    # Calculates and conditinally modifies state 
-    def set_indiv_leg_end_loc(self, leg, newval, write=True):
-        leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        phi = self.OFFSET_ANGLE[leg] + np.arctan2(-newval[0], newval[1])
-        retval = np.copy(newval)
-        retval[0] = self._leg_ori_abs[leg, 0] + leg_len*np.cos(to_rads(phi))
-        retval[1] = self._leg_ori_abs[leg, 1] + leg_len*np.sin(to_rads(phi))
-
-        if write:
-            self._leg_end_loc[leg] = newval
-            self._leg_end_abs[leg] = retval
-
-        return retval
-
-    # The write modifier lets one calculate the value without writing to state
-    def set_indiv_leg_end_abs(self, leg, newval, write=True):
-        delta_xy = newval[0:2] - self._leg_ori_abs[leg, 0:2] # Difference in x-y coordinates from leg origin
-        leg_len = pythagoras(delta_xy)
-        leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE
-        # Normalise angles
-        if (-360-45) <= leg_angle <= (-360+45):
-            leg_angle += 360
-        elif (360-45) <= leg_angle <= (360+45): 
-            leg_angle -= 360
-        retval = np.copy(newval)
-        retval[0] = leg_len * np.sin(to_rads(-leg_angle)) + self._leg_ori_loc[leg, 0]
-        retval[1] = leg_len * np.cos(to_rads(leg_angle)) + self._leg_ori_loc[leg, 1]
-        
-        if write:
-            self._leg_end_abs[leg] = newval
-            self._leg_end_loc[leg] = retval
-            self._leg_angle = leg_angle
-        
-        return retval # Returns the local coords given change in abs
-        
-    def set_indiv_leg_angle(self, leg, newval):
-        self._leg_angle[leg] = newval
-        leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        if self._leg_angle[leg] <= -360:
-            self._leg_angle[leg] += 360
-        elif self._leg_angle[leg] >= 360:
-            self._leg_angle[leg] -= 360
-        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]-90.0))
-        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]-90.0))
-        self.set_indiv_leg_end_loc(leg, self._leg_end_loc)
 
     # Sets value for leg origin (updates local values accordingly)
     def set_leg_ori_abs(self, newval, write=True):
