@@ -27,7 +27,7 @@ server_address = (target_name, target_port)
 
 # initialise hexapod object
 leg_end_coords = np.tile((0.0, 68.75, 0.0), (6,1)) # check back
-leg_angles = np.tile(90.0, 6)  # leg angle init
+leg_angles = np.tile(0.0, 6)  # leg angle init
 # print(leg_end_coords, leg_end_coords.shape)
 walky = hexapod.hexapod(leg_end_loc=leg_end_coords, leg_angle=leg_angles)
 

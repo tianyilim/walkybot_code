@@ -245,7 +245,7 @@ class hexapod:
     _leg_ori_loc = np.zeros((6,3)) # local coordinates of leg origins (local to each leg)
     _leg_end_abs = np.zeros((6,3)) # absolute coordinates
     _leg_ori_abs = np.zeros((6,3))
-    _leg_angle = np.zeros(6) # Each leg's coxa angle (gamma)
+    _leg_angle = np.zeros(6) # Each leg's coxa angle (gamma) - in the leg frame. Default is 0.0
     _body_z = 68.825 # Body origin (0,0,z)
     _roll = 0.0
     _pitch = 0.0
@@ -269,7 +269,7 @@ class hexapod:
     legset2 = None
     
     def __init__(self, leg_end_loc=None, leg_ori_loc=None, leg_end_abs=None, 
-                leg_angle=np.array((90.0, 90.0, 90.0, 90.0, 90.0, 90.0)), body_z=68.825, roll=0.0, pitch=0.0):
+                leg_angle=np.array((0.0, 0.0, 0.0, 0.0, 0.0, 0.0)), body_z=68.825, roll=0.0, pitch=0.0):
 
         self._leg_angle = leg_angle # initialise these constants
         self._body_z = body_z
@@ -321,7 +321,7 @@ class hexapod:
         self._leg_end_loc = newval
         self._leg_end_abs[:, 2] = self._leg_end_loc[:, 2] # Z is absolute
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        phi = self.OFFSET_ANGLE + (self._leg_angle-90.0) + self._yaw
+        phi = self.OFFSET_ANGLE + self._leg_angle + self._yaw
         self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len * np.cos(to_rads(phi))
         self._leg_end_abs[:, 1] = self._leg_ori_abs[:, 1] + leg_len * np.sin(to_rads(phi))
         # phi = 180-self.OFFSET_ANGLE-self._leg_angle
@@ -331,25 +331,27 @@ class hexapod:
     # Sets absolute value for leg tip (updates local values accordingly)
     # Overwrites angle as well
     # need to take into account yaw values too (?)
-    # TODO FIX this tomorrow.
     def set_leg_end_abs(self, newval):
         self._leg_end_abs = newval
         self._leg_end_loc[:, 2] = self._leg_end_abs[:, 2] # Z is absolute
-        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2] # Difference in x-y coordinates from leg origin
+        # Calc dist of leg from base (final-initial)
+        delta_xy = self._leg_end_abs[:, 0:2] - self._leg_ori_abs[:, 0:2]
         leg_len = pythagoras(delta_xy)
         print("delta_xy:", delta_xy, "leg_len:", leg_len)
-        self._leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) - self.OFFSET_ANGLE + 90.0
+        # Find angle of leg
+        self._leg_angle = to_degs( np.arctan2(delta_xy[:, 1], delta_xy[:, 0]) ) - self.OFFSET_ANGLE
         print("Leg angles:\n", self._leg_angle)
-        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle))
-        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
+        # calculate xy values (Offset by their initial val)
+        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(-self._leg_angle)) + self._leg_ori_loc[:,0]
+        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle)) + self._leg_ori_loc[:,1]
 
     # Sets value for leg (coxa) angle - should change both absolute and local
     # leg positions(x,y) as well.
     def set_leg_angle(self, newval):
         self._leg_angle = newval
         leg_len = pythagoras(self._leg_end_loc[:, 0:2])
-        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(self._leg_angle-90.0))
-        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle-90.0))
+        self._leg_end_loc[:, 0] = leg_len * np.sin(to_rads(-self._leg_angle))
+        self._leg_end_loc[:, 1] = leg_len * np.cos(to_rads(self._leg_angle))
         self.set_leg_end_loc(self._leg_end_loc)
         # phi = 180-self.OFFSET_ANGLE-self._leg_angle
         # self._leg_end_abs[:, 0] = self._leg_ori_abs[:, 0] + leg_len*np.sin(to_rads(phi))
@@ -359,7 +361,7 @@ class hexapod:
         self._leg_end_loc[leg] = newval
         self._leg_end_abs[leg, 2] = self._leg_end_loc[leg, 2] # Z is absolute
         leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        phi = self.OFFSET_ANGLE[leg] + self._leg_angle[leg] - 90.0 + self._yaw
+        phi = self.OFFSET_ANGLE[leg] + self._leg_angle[leg] + self._yaw
         self._leg_end_abs[leg, 0] = self._leg_ori_abs[leg, 0] + leg_len*np.cos(to_rads(phi))
         self._leg_end_abs[leg, 1] = self._leg_ori_abs[leg, 1] + leg_len*np.sin(to_rads(phi))
 
@@ -368,15 +370,15 @@ class hexapod:
         self._leg_end_loc[leg, 2] = self._leg_end_abs[leg, 2] # Z is absolute
         delta_xy = self._leg_end_abs[leg, 0:2] - self._leg_ori_abs[leg, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
-        self._leg_angle = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE + 90.0
-        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]-90.0))
-        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]-90.0))
+        self._leg_angle[leg] = to_degs( np.arctan2(delta_xy[1], delta_xy[0]) ) - self.OFFSET_ANGLE
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(-self._leg_angle[leg]))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
 
     def set_indiv_leg_angle(self, leg, newval):
         self._leg_angle[leg] = newval
         leg_len = pythagoras(self._leg_end_loc[leg, 0:2])
-        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(self._leg_angle[leg]-90.0))
-        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]-90.0))
+        self._leg_end_loc[leg, 0] = leg_len * np.sin(to_rads(-self._leg_angle[leg]))
+        self._leg_end_loc[leg, 1] = leg_len * np.cos(to_rads(self._leg_angle[leg]))
         self.set_indiv_leg_end_loc(leg, self._leg_end_loc)
 
     # Sets value for leg origin (updates local values accordingly)
