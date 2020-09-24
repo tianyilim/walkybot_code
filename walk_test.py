@@ -33,6 +33,7 @@ def reset(delay):
 start_time = time.time()
 curr_time = 0.0
 print("\n\n//////////////WALK test//////////////\n")
-while curr_time < TEST_DUR:
-    walky.tripod_gait(127, 0, 0)
+# while curr_time < TEST_DUR:
+
+# walky.tripod_gait(127, 0, 0)
 
