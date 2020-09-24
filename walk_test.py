@@ -42,5 +42,11 @@ dx = 20
 dy = 0 
 theta = 0
 
-walky.move_legs(set1, dx, dy, theta)
-# walky.move_legs(set2, dx, dy, theta)
+for x in range(4):
+    print("\n\n//////////////SET1//////////////\n")
+    walky.move_legs(set1, dx, dy, theta)
+    print("\n\n//////////////SET2//////////////\n")
+    walky.move_legs(set2, dx, dy, theta)
+
+input("Done, reset?")
+reset()

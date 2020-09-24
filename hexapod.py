@@ -91,7 +91,7 @@ class hex_leg:
     LEG_ORI_START = np.array((0.0, 0.0, 68.825))
 
     def __init__(self, leg_end, leg_ori_z, leg_nums, servoKit, leg_name, left_right,
-                limits=(45.0, 70.0, 80.0), offsets=(0.0, 0.0, 0.0) ):
+                limits=(45.0, 65.0, 70.0), offsets=(0.0, 0.0, 0.0) ):
 
         self._leg_ori[2] = leg_ori_z
         self._leg_end = leg_end
@@ -141,16 +141,17 @@ class hex_leg:
         else:
             self.joints[2].writeAngle( self._leg_angles[2])
 
-    # Leg tip moves, leg origin does not
+    # Leg tip moves, leg origin does not. Updated to reflect current robot state
     def swing(self, leg_end):
-        coxa_angle_ik = np.arctan2(leg_end[0], leg_end[1]) # 'gamma' in notes
+        delta = leg_end - self._leg_ori # Delta between leg origin and new end
+        coxa_angle_ik = np.arctan2(delta[0], delta[1]) # 'gamma' in notes
 
         coxa_len_ik = self.COXA_LEN * np.cos( coxa_angle_ik ) # Takes side view of this thing.
         femur_len_ik = self.FEMUR_LEN * np.cos( coxa_angle_ik )
         tibia_len_ik = self.TIBIA_LEN * np.cos( coxa_angle_ik )
 
-        y_offset_ik = leg_end[1] - coxa_len_ik
-        z_offset_ik = self.TIBIA_LEN - leg_end[2]
+        y_offset_ik = leg_end[1] - coxa_len_ik - self._leg_ori[1] # y-distance between tibia joint and desired leg pos
+        z_offset_ik = self._leg_ori[2] - leg_end[2] # curr z-height - desired z height
         l_len = np.sqrt( np.power(z_offset_ik,2) + np.power(y_offset_ik,2) )
 
         # print("z_offset_ik: %0.4f | y_offset_ik: %0.4f | l_len: %0.4f" %(z_offset_ik, y_offset_ik, l_len) )
@@ -175,21 +176,19 @@ class hex_leg:
             self._leg_angles = np.array( (to_degs(coxa_angle_ik)+90, to_degs(femur_angle_ik), to_degs(tibia_angle_ik)) )
             # self.writeAngles() # Don't write angles just yet
             
-            print("For leg", self.leg_name)
-            print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
-            print("")
-
+            # print("For leg", self.leg_name)
+            # print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
+            # print("")
             return True
 
         else:
             warnings.warn("%s, position is not possible" %(self.leg_name))
             return False
-        
 
     # Leg origin moves, leg end does not.
     def stance(self, leg_ori):
-        diff = leg_ori - self.LEG_ORI_START
-        # print("Curr origin:", self._leg_ori, "Diff:", diff)
+        diff = leg_ori - self._leg_ori
+        # print("Leg", self.leg_name, "stance: Curr origin:\n", self._leg_ori, "\nDiff:\n", diff)
         save_leg_end = self._leg_end
         swing_success = self.swing(self._leg_end-diff)
         self._leg_ori = leg_ori # update leg origin
@@ -505,6 +504,7 @@ class hexapod:
         newvals[:, 1] = distances * np.sin( to_rads( angles ) )
         # print("New absolute origins after rotation:\n", newvals)
         if write:
+            self._body_center += delta
             self._leg_ori_abs = newvals
         return newvals
 
@@ -523,7 +523,7 @@ class hexapod:
 
     # calculates the required final positions of <legs> based on delta x/y, and rotation angle (theta)
     # Pass in a TUPLE (,) for leg_index!
-    def move_legs(self, leg_move, dx, dy, theta, speed=0.25):
+    def move_legs(self, leg_move, dx, dy, theta, speed=0.75):
         move_time = 1/speed
         leg_stance_list = [i for i in [0,1,2,3,4,5] if i not in leg_move] # Legs that aren't moving at the moment
         leg_stance = np.array(leg_stance_list)
@@ -594,20 +594,20 @@ class hexapod:
             print("Local leg origins:\n", self.get_leg_ori_loc())
             print("Local leg ends:\n", self.get_leg_end_loc())
 
-            self.update_legs_stance(leg_stance, write=False)
-            self.update_legs_swing(leg_move, write=False) # update legs
+            self.update_legs_stance(leg_stance, write=True)
+            self.update_legs_swing(leg_move, write=True) # update legs
             self.write_leg_angles()
             t = time.time()-time_ref
 
-            # time.sleep(0.5) # Less datapoints makes me happy
+            time.sleep(0.1) # Less datapoints makes me happy
 
             # assert(0)
 
         # end point of swing/stance motions
         self.set_leg_ori_abs(body_endpoint)
         self.set_leg_end_abs(endpoints, leg_index=leg_move)
-        self.update_legs_stance(leg_stance, write=False)
-        self.update_legs_swing(leg_move, write=False) # update legs
+        self.update_legs_stance(leg_stance, write=True)
+        self.update_legs_swing(leg_move, write=True) # update legs
         self.write_leg_angles()
 
     def tripod_gait(self, speed_x, speed_y, speed_rotation, MAX_STEP=30.0, MAX_ROTATE=30.0):
