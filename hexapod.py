@@ -175,7 +175,9 @@ class hex_leg:
             self._leg_angles = np.array( (to_degs(coxa_angle_ik)+90, to_degs(femur_angle_ik), to_degs(tibia_angle_ik)) )
             # self.writeAngles() # Don't write angles just yet
             
-            # print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
+            print("For leg", self.leg_name)
+            print("coxa angle: %0.4f | femur angle: %0.4f | tibia angle: %0.4f" %(self._leg_angles[0], self._leg_angles[1], self._leg_angles[2]))
+            print("")
 
             return True
 
@@ -341,6 +343,7 @@ class hexapod:
     # need to take into account yaw values too (?)
     def set_leg_end_abs(self, newval, leg_index=np.array((0,1,2,3,4,5)), write=True):
         # print(leg_index, leg_index.shape)
+        print("Set_leg_end_abs: | newval:\n", newval, "\nleg_index:", leg_index)
         delta_xy = newval[:, 0:2] - self._leg_ori_abs[leg_index, 0:2] # Difference in x-y coordinates from leg origin
         leg_len = pythagoras(delta_xy)
         print("Set_leg_end_abs: | delta_xy:\n", delta_xy, "\nleg_len:", leg_len)
@@ -355,7 +358,7 @@ class hexapod:
         retval = np.copy(newval)
         retval[:, 0] = leg_len * np.sin(to_rads(-leg_angle)) + self._leg_ori_loc[leg_index,0]
         retval[:, 1] = leg_len * np.cos(to_rads(leg_angle)) + self._leg_ori_loc[leg_index,1]
-        print("Set_leg_end_abs: | Return values:\n", retval)
+        print("Set_leg_end_abs: | Return values (local):\n", retval)
 
         if write:
             self._leg_end_abs[leg_index] = newval
@@ -584,7 +587,7 @@ class hexapod:
             self.write_leg_angles()
             t = time.time()-time_ref
 
-            assert(0)
+            # assert(0)
 
         # end point of swing/stance motions
         self.set_leg_ori_abs(body_endpoint)
