@@ -44,8 +44,6 @@ def reset(delay):
     walky.update_legs_stance()
     time.sleep(delay)
 
-start_time = time.time()
-curr_time = 0.0
 print("\n\n//////////////LEG MOVEMENT test//////////////\n")
 # while curr_time < TEST_DUR:
 

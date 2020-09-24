@@ -266,7 +266,7 @@ class hexapod:
     OFFSET_Z = np.tile(_body_center[2],6)
     OFFSET_ANGLE = np.array((30, 90, 150, 210, 270, 330), dtype='float32') # Modify angle offset for each
     OFFSET_ORIGINS = np.transpose((OFFSET_PITCH, OFFSET_ROLL,OFFSET_Z))
-    RAISE_OFFSET = 20 # Leg will raise to 20 from the ground
+    RAISE_OFFSET = 30 # Leg will raise to 20 from the ground
 
     # Addressing all legs
     legs = None
@@ -494,15 +494,18 @@ class hexapod:
         self.body_roll(self._roll)
 
     # delta = (x,y,z)
-    def body_translate(self, delta, theta):
+    def body_translate(self, delta, theta, write=True):
         newvals = np.copy(self._leg_ori_abs)
-        newvals[:,0:3] += delta[0:3]
-        angles = self.OFFSET_ANGLE + theta
-        distances = pythagoras( newvals[:, 0:2] )
+        newvals[:,:] += delta[:]
+        print("body_translate | vals bef rot:\n", newvals)
+        angles = to_degs(np.arctan2(newvals[:,1], newvals[:,0])) + theta
+        distances = pythagoras( newvals[:,0:2] )
         # Rotation happens here
         newvals[:, 0] = distances * np.cos( to_rads( angles ) )
         newvals[:, 1] = distances * np.sin( to_rads( angles ) )
         # print("New absolute origins after rotation:\n", newvals)
+        if write:
+            self._leg_ori_abs = newvals
         return newvals
 
     # Recenters origin coordinates back to (0,0) - after successfully moving?
@@ -522,7 +525,10 @@ class hexapod:
     # Pass in a TUPLE (,) for leg_index!
     def move_legs(self, leg_move, dx, dy, theta, speed=0.25):
         move_time = 1/speed
-        leg_stance = [i for i in [0,1,2,3,4,5] if i not in leg_move] # Legs that aren't moving at the moment
+        leg_stance_list = [i for i in [0,1,2,3,4,5] if i not in leg_move] # Legs that aren't moving at the moment
+        leg_stance = np.array(leg_stance_list)
+        print("Leg_move:\n", leg_move)
+        print("Leg_stance:\n", leg_stance)
         # Calculate the movement required for moving legs
         delta = np.array((dx,dy,0.0))
         leg_delta = np.tile(delta, (len(leg_move),1))
@@ -539,16 +545,18 @@ class hexapod:
         print("Rotation Distance is\n", rot_dist)
         leg_len = pythagoras(rot_dist[:,0:2])
         print("leg lengths:", leg_len)
-        angles = self.OFFSET_ANGLE[leg_move] + theta
+        # angles = self.OFFSET_ANGLE[leg_move] + theta
+        angles = to_degs(np.arctan2(rot_dist[:,1], rot_dist[:,0])) + theta
         print("Desired angles:", angles)
         endpoints[:, 0] = leg_len * np.cos( to_rads( -angles ) ) + ctr[0]
         endpoints[:, 1] = leg_len * np.sin( to_rads( angles ) ) + ctr[1]
         print("Endpoints after rotation:\n", endpoints)
 
         # Calculate the movement required for shifting body: move chassis points
-        body_delta = delta / 6 * len(leg_move)
-        body_startpoint = self._leg_ori_loc
-        body_endpoint = self.body_translate(body_delta, theta)
+        # body_delta = delta / 6 * len(leg_move)
+        body_delta = delta
+        body_startpoint = self._leg_ori_abs
+        body_endpoint = self.body_translate(body_delta, theta, write=False)
         print("Body Delta:\n", body_delta, "\nBody Endpoint\n", body_endpoint)
 
         # calculate a movement plan
@@ -561,19 +569,23 @@ class hexapod:
         grad_down = (endpoints - im_pos) / move_time
         grad_body = (body_endpoint - body_startpoint) / (move_time*2) # movement gradient for body
 
+        print("grad_up:\n", grad_up)
+        print("grad_down:\n", grad_down)
+        print("grad_body:\n", grad_body)
         # assert(0)
 
         time_ref = time.time() # Move legs in a pseudo-linear fashion
         t = time.time()-time_ref
         while t < move_time*2:
             print("\n\nCurrent time:", t)
+            
             # move upwards
             if t < move_time:
                 demand = startpoint + grad_up*t
                 self.set_leg_end_abs(demand, leg_index=leg_move)
             # move downwards to endpoint
             else:
-                demand = im_pos + grad_down*t
+                demand = im_pos + grad_down*(t-move_time)
                 self.set_leg_end_abs(demand, leg_index=leg_move)
 
             self.set_leg_ori_abs(body_startpoint+grad_body*t)
@@ -586,6 +598,8 @@ class hexapod:
             self.update_legs_swing(leg_move, write=False) # update legs
             self.write_leg_angles()
             t = time.time()-time_ref
+
+            # time.sleep(0.5) # Less datapoints makes me happy
 
             # assert(0)
 
