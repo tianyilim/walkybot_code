@@ -89,7 +89,7 @@ class hex_leg:
     LEG_ORI_START = np.array((0.0, 0.0, 68.825))
 
     def __init__(self, leg_end, leg_ori_z, leg_nums, servoKit, leg_name, left_right,
-                limits=(45.0, 65.0, 65.0), offsets=(0.0, 0.0, 0.0) ):
+                limits=(45.0, 60.0, 60.0), offsets=(0.0, 0.0, 0.0) ):
 
         self._leg_ori[2] = leg_ori_z
         self._leg_end = leg_end
@@ -641,7 +641,7 @@ class hexapod:
         # print("")
 
     tripod_state = 0
-    def tripod_gait(self, speed_x, speed_y, speed_rotation, roll, pitch, MAX_STEP=35.0, MAX_ROTATE=30.0, step_speed=1.0):
+    def tripod_gait(self, speed_x, speed_y, speed_rotation, roll, pitch, MAX_STEP=30.0, MAX_ROTATE=25.0, step_speed=1.0):
         delta_x = (speed_x/127)*MAX_STEP
         delta_y = (speed_y/127)*MAX_STEP
         delta_yaw = (speed_rotation/127)*MAX_ROTATE

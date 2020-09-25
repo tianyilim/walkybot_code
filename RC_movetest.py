@@ -54,11 +54,11 @@ def move_robot():
         # walky.body_roll(tilt_use[1])
         # walky.body_translate_z(updown_use*4)
         if abs(translate_use[0]) > 10 or abs(translate_use[1]) > 10 or abs(rotate) > 10: 
-            walky.tripod_gait(translate_use[0], translate_use[1], rotate_use, tilt_use[0], tilt_use[1], step_speed=1.5)
+            walky.tripod_gait(translate_use[0], translate_use[1], rotate_use, tilt_use[0], tilt_use[1], step_speed=2.0)
             leg_rst_flag = 0
         else:
             if leg_rst_flag==0 or leg_rst_flag==1:
-                walky.tripod_gait(0, 0, 0, 0, 0, step_speed=1.5)
+                walky.tripod_gait(0, 0, 0, 0, 0, step_speed=2.0)
                 leg_rst_flag += 1
             else:
                 walky.write_leg_angles()
