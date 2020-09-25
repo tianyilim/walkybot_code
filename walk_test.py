@@ -39,17 +39,62 @@ set1 = np.array((0,2,4))
 set2 = np.array((1,3,5))
 
 dx = 20
-dy = 0 
-theta = 0
+dy = 20 
+theta = 20
 
 for x in range(2):
     print("\n\n//////////////SET1//////////////\n")
-    walky.move_legs(set1, dx, dy, theta)
-    input("next?")
+    walky.move_legs(set1, dx, 0, 0)
+    # input("next?")
 
     print("\n\n//////////////SET2//////////////\n")
-    walky.move_legs(set2, dx, dy, theta)
-    input("next?")
+    walky.move_legs(set2, dx, 0, 0)
+    # input("next?")
+
+for x in range(2):
+    print("\n\n//////////////SET1//////////////\n")
+    walky.move_legs(set1, -dx, 0, 0)
+    # input("next?")
+
+    print("\n\n//////////////SET2//////////////\n")
+    walky.move_legs(set2, -dx, 0, 0)
+    # input("next?")
+
+for x in range(2):
+    print("\n\n//////////////SET1//////////////\n")
+    walky.move_legs(set1, 0, dy, 0)
+    # input("next?")
+
+    print("\n\n//////////////SET2//////////////\n")
+    walky.move_legs(set2, 0, dy, 0)
+    # input("next?")
+
+for x in range(2):
+    print("\n\n//////////////SET1//////////////\n")
+    walky.move_legs(set1, 0, -dy, 0)
+    # input("next?")
+
+    print("\n\n//////////////SET2//////////////\n")
+    walky.move_legs(set2, 0, -dy, 0)
+    # input("next?")
+
+for x in range(2):
+    print("\n\n//////////////SET1//////////////\n")
+    walky.move_legs(set1, 0, 0, theta)
+    # input("next?")
+
+    print("\n\n//////////////SET2//////////////\n")
+    walky.move_legs(set2, 0, 0, theta)
+    # input("next?")
+
+for x in range(2):
+    print("\n\n//////////////SET1//////////////\n")
+    walky.move_legs(set1, 0, 0, -theta)
+    # input("next?")
+
+    print("\n\n//////////////SET2//////////////\n")
+    walky.move_legs(set2, 0, 0, -theta)
+    # input("next?")
 
 input("Done, reset?")
-reset()
+reset(0)
