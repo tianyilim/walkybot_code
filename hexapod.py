@@ -264,7 +264,7 @@ class hexapod:
     START_LEG_ORI_LOC = np.transpose((OFFSET_PITCH, OFFSET_ROLL,OFFSET_Z)) # local
     START_LEG_END = None # Absolute
     START_LEG_ORI = None # Absolute
-    RAISE_OFFSET = 30 # Leg will raise to 20 from the ground
+    RAISE_OFFSET = 40 # Leg will raise to 20 from the ground
 
     # addressing all legs
     legs = None
@@ -396,19 +396,22 @@ class hexapod:
 
         return retval
 
+    # TODO fix pitch, roll, rotate, +-Z with regard to current body coordinates, and absolute yaw readings
     # Rolls the body. Body absolute and relative coordinates change. Call this before any other functions!
     def body_roll(self, roll):
         self._roll = roll
         newvals = np.copy(self._leg_ori_abs)
         newvals[:,2] = self._body_center[2] + self.OFFSET_ROLL*np.sin(-to_rads(self._roll)) + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch))
         newvals[:,1] = self.OFFSET_ROLL*np.cos(-to_rads(self._roll)) + self._body_center[1]
+        newvals[:,0] = None
         self.set_leg_ori_abs(newvals)
-
+ 
     # Pitches the body. Body absolute and relative coordinates change.
     def body_pitch(self, pitch):
         self._pitch = pitch
         newvals = np.copy(self._leg_ori_abs)
         newvals[:,2] = self._body_center[2] + self.OFFSET_PITCH*np.sin(to_rads(-self._pitch)) + self.OFFSET_ROLL*np.sin(-to_rads(self._roll))
+        newvals[:,1] = None
         newvals[:,0] = self.OFFSET_PITCH*np.cos(-to_rads(self._pitch)) + self._body_center[0]
         self.set_leg_ori_abs(newvals)
 
@@ -497,7 +500,7 @@ class hexapod:
         # print("body_translate | angles:\n", angles)
         # print("body_translate | distances:\n", distances)
         # Rotation happens here
-        newvals[:, 0] = distances * np.cos( to_rads( -angles ) ) + ctr[0]
+        newvals[:, 0] = distances * np.cos( to_rads( angles ) ) + ctr[0]
         newvals[:, 1] = distances * np.sin( to_rads( angles ) ) + ctr[1]
         # print("body_translate | vals aft rot:\n", newvals)
         if write:
@@ -516,7 +519,7 @@ class hexapod:
 
     # calculates the required final positions of <legs> based on delta x/y, and rotation angle (theta)
     # Pass in a TUPLE (,) for leg_index!
-    def move_legs(self, leg_move, dx, dy, theta, roll, pitch, speed=1.0):
+    def move_legs(self, leg_move, dx, dy, theta, roll=0.0, pitch=0.0, speed=1.0):
         move_time = 1/speed
         leg_stance_list = [i for i in [0,1,2,3,4,5] if i not in leg_move] # Legs that aren't moving at the moment
         leg_stance = np.array(leg_stance_list)
@@ -531,35 +534,33 @@ class hexapod:
         idealised_endpoint = np.copy(self.START_LEG_END[leg_move])
         idealised_endpoint[:,0] += dx
         idealised_endpoint[:,1] += dy
-
         idealised_delta = idealised_endpoint-self.START_LEG_ORI[leg_move]
 
         idealised_dist = pythagoras(idealised_delta[:,0:2])
-        idealised_angles = to_degs(np.arctan2(idealised_delta[:,1], idealised_delta[:,0]))
+        idealised_angles = to_degs(np.arctan2(idealised_delta[:,1], idealised_delta[:,0])) + theta
         # print("idealised_dists:\n", idealised_dist, "\nidealised_angles:\n", idealised_angles)
 
-        endpoints[:,0] = self._leg_ori_abs[leg_move,0] + idealised_dist*np.cos(to_rads(-idealised_angles))
+        endpoints[:,0] = self._leg_ori_abs[leg_move,0] + idealised_dist*np.cos(to_rads(idealised_angles))
         endpoints[:,1] = self._leg_ori_abs[leg_move,1] + idealised_dist*np.sin(to_rads(idealised_angles))
         # leg_delta = np.tile(delta, (len(leg_move),1))
         leg_delta = endpoints - self._leg_end_abs[leg_move]
 
-        # print("Endpoints after adding delta:\n", endpoints)
+        # print("Endpoints after adding delta and rotate:\n", endpoints)
         # Rotate (about shifted body center)
-        ctr = self._body_center + delta
-        # print("Rotation center is:\n", ctr)
-        rot_dist = endpoints-np.tile(ctr, (len(leg_move),1))
-        # print("Rotation Distance is\n", rot_dist)
-        leg_len = pythagoras(rot_dist[:,0:2])
-        # print("leg lengths:", leg_len)
-        # angles = self.OFFSET_ANGLE[leg_move] + theta
-        angles = to_degs(np.arctan2(rot_dist[:,1], rot_dist[:,0])) + theta
-        # print("Desired angles:", angles)
-        endpoints[:, 0] = leg_len * np.cos( to_rads( -angles ) ) + ctr[0]
-        endpoints[:, 1] = leg_len * np.sin( to_rads( angles ) ) + ctr[1]
+        # ctr = self._body_center + delta
+        # # print("Rotation center is:\n", ctr)
+        # rot_dist = endpoints-np.tile(ctr, (len(leg_move),1))
+        # # print("Rotation Distance is\n", rot_dist)
+        # leg_len = pythagoras(rot_dist[:,0:2])
+        # # print("leg lengths:", leg_len)
+        # # angles = self.OFFSET_ANGLE[leg_move] + theta
+        # angles = to_degs(np.arctan2(rot_dist[:,1], rot_dist[:,0])) + theta
+        # # print("Desired angles:", angles)
+        # endpoints[:, 0] = leg_len * np.cos( to_rads( angles ) ) + ctr[0]
+        # endpoints[:, 1] = leg_len * np.sin( to_rads( angles ) ) + ctr[1]
         # print("Endpoints after rotation:\n", endpoints)
 
         # Calculate the movement required for shifting body: move chassis points
-        # body_delta = delta / 6 * len(leg_move)
         body_delta = delta
         body_startpoint = self._leg_ori_abs
         body_endpoint = self.body_translate(body_delta, theta, write=False)
@@ -590,9 +591,6 @@ class hexapod:
         time_ref = time.time() # Move legs in a pseudo-linear fashion
         t = 0.0
         while t < move_time*2:
-            
-            self.body_pitch(roll) # nonblocking...
-            self.body_roll(pitch)
             # rotate = int_twosComp(data[4]) / SCALE
 
             # print("\n\nCurrent time:", t)
@@ -639,11 +637,11 @@ class hexapod:
         # print("Local leg ends:\n", self.get_leg_end_loc())
         # print("Body Center:\n", self.get_body_center())
         # for leg in self.legs:
-            # leg.debug_print()
+        #     leg.debug_print()
         # print("")
 
     tripod_state = 0
-    def tripod_gait(self, speed_x, speed_y, speed_rotation, roll, pitch, MAX_STEP=30.0, MAX_ROTATE=30.0, step_speed=1.0):
+    def tripod_gait(self, speed_x, speed_y, speed_rotation, roll, pitch, MAX_STEP=35.0, MAX_ROTATE=30.0, step_speed=1.0):
         delta_x = (speed_x/127)*MAX_STEP
         delta_y = (speed_y/127)*MAX_STEP
         delta_yaw = (speed_rotation/127)*MAX_ROTATE

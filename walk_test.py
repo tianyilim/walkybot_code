@@ -41,31 +41,31 @@ set2 = np.array((1,3,5))
 
 dx = 20
 dy = 20 
-theta = 20
+theta = 30
 
-for x in range(TEST_LEN):
-    print("\n\n//////////////+X SET1//////////////\n")
-    walky.move_legs(set1, dx, 0, 0)
-    print("\n\n//////////////+X SET2//////////////\n")
-    walky.move_legs(set2, dx, 0, 0)
+# for x in range(TEST_LEN):
+#     print("\n\n//////////////+X SET1//////////////\n")
+#     walky.move_legs(set1, dx, 0, 0)
+#     print("\n\n//////////////+X SET2//////////////\n")
+#     walky.move_legs(set2, dx, 0, 0)
 
-for x in range(TEST_LEN):
-    print("\n\n//////////////-X SET1//////////////\n")
-    walky.move_legs(set1, -dx, 0, 0)
-    print("\n\n//////////////-X SET2//////////////\n")
-    walky.move_legs(set2, -dx, 0, 0)
+# for x in range(TEST_LEN):
+#     print("\n\n//////////////-X SET1//////////////\n")
+#     walky.move_legs(set1, -dx, 0, 0)
+#     print("\n\n//////////////-X SET2//////////////\n")
+#     walky.move_legs(set2, -dx, 0, 0)
 
-for x in range(TEST_LEN):
-    print("\n\n//////////////+Y SET1//////////////\n")
-    walky.move_legs(set1, 0, dy, 0)
-    print("\n\n//////////////+Y SET2//////////////\n")
-    walky.move_legs(set2, 0, dy, 0)
+# for x in range(TEST_LEN):
+#     print("\n\n//////////////+Y SET1//////////////\n")
+#     walky.move_legs(set1, 0, dy, 0)
+#     print("\n\n//////////////+Y SET2//////////////\n")
+#     walky.move_legs(set2, 0, dy, 0)
     
-for x in range(TEST_LEN):
-    print("\n\n//////////////-Y SET1//////////////\n")
-    walky.move_legs(set1, 0, -dy, 0)
-    print("\n\n//////////////-Y SET2//////////////\n")
-    walky.move_legs(set2, 0, -dy, 0)
+# for x in range(TEST_LEN):
+#     print("\n\n//////////////-Y SET1//////////////\n")
+#     walky.move_legs(set1, 0, -dy, 0)
+#     print("\n\n//////////////-Y SET2//////////////\n")
+#     walky.move_legs(set2, 0, -dy, 0)
 
 for x in range(TEST_LEN):
     print("\n\n//////////////+T SET1//////////////\n")
@@ -80,9 +80,9 @@ for x in range(TEST_LEN):
     walky.move_legs(set2, 0, 0, -theta)
 
 for x in range(TEST_LEN):
-    print("\n\n//////////////-T SET1//////////////\n")
+    print("\n\n//////////////RESET SET1//////////////\n")
     walky.move_legs(set1, 0, 0, 0)
-    print("\n\n//////////////-T SET2//////////////\n")
+    print("\n\n//////////////RESET SET2//////////////\n")
     walky.move_legs(set2, 0, 0, 0)
 
 input("Done, reset?")
