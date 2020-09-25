@@ -266,6 +266,7 @@ class hexapod:
     OFFSET_ANGLE = np.array((30, 90, 150, 210, 270, 330), dtype='float32') # Modify angle offset for each
     START_LEG_ORI_LOC = np.transpose((OFFSET_PITCH, OFFSET_ROLL,OFFSET_Z)) # local
     START_LEG_END = None # Absolute
+    START_LEG_ORI = None # Absolute
     RAISE_OFFSET = 30 # Leg will raise to 20 from the ground
 
     # addressing all legs
@@ -316,6 +317,7 @@ class hexapod:
         self.legs = (leg_r1, leg_r2, leg_r3, leg_l3, leg_l2, leg_l1)
 
         self.START_LEG_END = self.get_leg_end_abs()
+        self.START_LEG_ORI = self.get_leg_ori_abs()
 
         self.time_ref = time.time() # Start time of epoch - used for smoothing out motions
 
@@ -536,8 +538,10 @@ class hexapod:
         idealised_endpoint[:,0] += dx
         idealised_endpoint[:,1] += dy
 
-        idealised_dist = pythagoras(idealised_endpoint[:,0:2])
-        idealised_angles = to_degs(np.arctan2(idealised_endpoint[:,1], idealised_endpoint[:,0]))
+        idealised_delta = idealised_endpoint-self.START_LEG_ORI
+
+        idealised_dist = pythagoras(idealised_delta[:,0:2])
+        idealised_angles = to_degs(np.arctan2(idealised_delta[:,1], idealised_delta[:,0]))
         print("idealised_dists:\n", idealised_dist, "\nidealised_angles:\n", idealised_angles)
 
         endpoints[:,0] = self._leg_ori_abs[leg_move,0] + idealised_dist*np.cos(to_rads(-idealised_angles))
@@ -579,6 +583,8 @@ class hexapod:
         print("grad_down:\n", grad_down)
         print("grad_body:\n", grad_body)
         # assert(0)
+
+        input("Move on?")
 
         time_ref = time.time() # Move legs in a pseudo-linear fashion
         t = time.time()-time_ref
