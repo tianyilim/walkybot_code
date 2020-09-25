@@ -13,6 +13,7 @@ walky = hexapod.hexapod(leg_end_loc=leg_end_coords, leg_angle=leg_angles)
 amplitude = 30
 TEST_DUR = 8.0
 TIME_DELTA = 0.05
+TEST_LEN = 1
 
 print("Walkybot initial status:")
 walky.print_state()
@@ -42,59 +43,47 @@ dx = 20
 dy = 20 
 theta = 20
 
-for x in range(2):
-    print("\n\n//////////////SET1//////////////\n")
+for x in range(TEST_LEN):
+    print("\n\n//////////////+X SET1//////////////\n")
     walky.move_legs(set1, dx, 0, 0)
-    # input("next?")
-
-    print("\n\n//////////////SET2//////////////\n")
+    print("\n\n//////////////+X SET2//////////////\n")
     walky.move_legs(set2, dx, 0, 0)
-    # input("next?")
 
-for x in range(2):
-    print("\n\n//////////////SET1//////////////\n")
+for x in range(TEST_LEN):
+    print("\n\n//////////////-X SET1//////////////\n")
     walky.move_legs(set1, -dx, 0, 0)
-    # input("next?")
-
-    print("\n\n//////////////SET2//////////////\n")
+    print("\n\n//////////////-X SET2//////////////\n")
     walky.move_legs(set2, -dx, 0, 0)
-    # input("next?")
 
-for x in range(2):
-    print("\n\n//////////////SET1//////////////\n")
+for x in range(TEST_LEN):
+    print("\n\n//////////////+Y SET1//////////////\n")
     walky.move_legs(set1, 0, dy, 0)
-    # input("next?")
-
-    print("\n\n//////////////SET2//////////////\n")
+    print("\n\n//////////////+Y SET2//////////////\n")
     walky.move_legs(set2, 0, dy, 0)
-    # input("next?")
-
-for x in range(2):
-    print("\n\n//////////////SET1//////////////\n")
+    
+for x in range(TEST_LEN):
+    print("\n\n//////////////-Y SET1//////////////\n")
     walky.move_legs(set1, 0, -dy, 0)
-    # input("next?")
-
-    print("\n\n//////////////SET2//////////////\n")
+    print("\n\n//////////////-Y SET2//////////////\n")
     walky.move_legs(set2, 0, -dy, 0)
-    # input("next?")
 
-for x in range(2):
-    print("\n\n//////////////SET1//////////////\n")
+for x in range(TEST_LEN):
+    print("\n\n//////////////+T SET1//////////////\n")
     walky.move_legs(set1, 0, 0, theta)
-    # input("next?")
-
-    print("\n\n//////////////SET2//////////////\n")
+    print("\n\n//////////////+T SET2//////////////\n")
     walky.move_legs(set2, 0, 0, theta)
-    # input("next?")
 
-for x in range(2):
-    print("\n\n//////////////SET1//////////////\n")
+for x in range(TEST_LEN):
+    print("\n\n//////////////-T SET1//////////////\n")
     walky.move_legs(set1, 0, 0, -theta)
-    # input("next?")
-
-    print("\n\n//////////////SET2//////////////\n")
+    print("\n\n//////////////-T SET2//////////////\n")
     walky.move_legs(set2, 0, 0, -theta)
-    # input("next?")
+
+for x in range(TEST_LEN):
+    print("\n\n//////////////-T SET1//////////////\n")
+    walky.move_legs(set1, 0, 0, 0)
+    print("\n\n//////////////-T SET2//////////////\n")
+    walky.move_legs(set2, 0, 0, 0)
 
 input("Done, reset?")
 reset(0)
