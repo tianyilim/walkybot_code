@@ -82,9 +82,9 @@ def transmitInput(target_params):
         sent = sock.sendto(data, target_params)
         
         # Debug
-        # print("Sent %s bytes" %sent)
-        # for i, x in enumerate(data):
-        #     print(i, int_twosComp(x) )
+        print("Sent %s bytes" %sent)
+        for i, x in enumerate(data):
+            print(i, int_twosComp(x) )
         time.sleep(0.1) # Don't need to update so often
     
 print("Starting stuff")
